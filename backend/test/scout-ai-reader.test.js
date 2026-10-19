@@ -14,7 +14,7 @@ test('Scout AI has a bounded database reader before a question route can exist',
   );
 });
 
-const { readObjectionCohort, readTeamObjections } = require('../lib/scout-ai-reader');
+const { readObjectionCohort, readTeamObjections, readTeamObjectionLeaderboard } = require('../lib/scout-ai-reader');
 
 const CALLS = [
   { id: 'call-spouse', user_id: 'josh', fathom_call_id: 'real-spouse', prospect_id: 'prospect-spouse', title: 'Avery', call_date: '2026-10-02T12:00:00Z', recording_url: 'https://recording.example/spouse', not_a_sales_call: false, duplicate_of: null },
@@ -86,4 +86,18 @@ test('the bounded reader returns a team objection overview from saved strict mom
   assert.equal(result.most_raised.category, 'partner');
   assert.equal(result.most_raised.total, 2);
   assert.equal(result.least_handled.rate, 50);
+});
+
+test('the bounded reader returns a per-closer category leaderboard from saved facts', async () => {
+  const result = await readTeamObjectionLeaderboard(fakeAdmin(), {
+    userIds: ['josh'],
+    namesByUserId: { josh: 'Josh P' },
+    category: 'partner',
+    from: '2026-10-01T00:00:00Z',
+    to: '2026-10-05T00:00:00Z',
+  });
+  assert.equal(result.kind, 'team_objection_leaderboard');
+  assert.deepEqual(result.leaders[0], { user_id: 'josh', name: 'Josh P', handled: 1, total: 2, rate: 50 });
+  assert.equal(result.handled_examples.length, 1);
+  assert.equal(result.handled_examples[0].prospect_name, 'Avery');
 });

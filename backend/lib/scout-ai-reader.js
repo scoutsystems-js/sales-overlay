@@ -185,9 +185,42 @@ async function readTeamObjections(admin, request) {
   return overview;
 }
 
+async function readTeamObjectionLeaderboard(admin, request) {
+  var input = validateTeamRequest(request);
+  if (typeof input.category !== 'string' || !input.category.trim()) throw new Error('An objection category is required.');
+  var calls = await paged(function (from, to) {
+    return baseTeamCalls(admin, input.userIds)
+      .gte('call_date', input.from)
+      .lte('call_date', input.to)
+      .order('call_date', { ascending: false })
+      .range(from, to);
+  });
+  calls = realCallsOnly(calls);
+  var callById = {};
+  calls.forEach(function (call) { callById[call.id] = call; });
+  var moments = await highlightsForCalls(admin, calls.map(function (call) { return call.id; }));
+  moments.forEach(function (moment) {
+    var call = callById[moment.fathom_call_id];
+    if (call) moment.user_id = call.user_id;
+  });
+  var analyses = await analysesForCalls(admin, calls.map(function (call) { return call.id; }));
+  var leaderboard = facts.summarizeTeamObjectionLeaderboard(moments, outcomesByCall(analyses), input.category, input.namesByUserId || {});
+  // A closed outcome may count toward the documented rate, but it never proves
+  // an objection was handled well enough to teach from. Supporting calls stay
+  // limited to saved moments explicitly marked handled, for the top closer.
+  var best = leaderboard.leaders[0];
+  var bestCalls = calls.filter(function (call) { return best && call.user_id === best.user_id; });
+  var bestMoments = moments.filter(function (moment) { return best && moment.user_id === best.user_id; });
+  leaderboard.handled_examples = facts.selectObjectionExamples(bestMoments, callsById(bestCalls), { category: input.category }, 'handled');
+  leaderboard.window = { from: input.from, to: input.to };
+  leaderboard.calls_in_window = calls.length;
+  return leaderboard;
+}
+
 module.exports = {
   validateRequest: validateRequest,
   validateTeamRequest: validateTeamRequest,
   readObjectionCohort: readObjectionCohort,
   readTeamObjections: readTeamObjections,
+  readTeamObjectionLeaderboard: readTeamObjectionLeaderboard,
 };

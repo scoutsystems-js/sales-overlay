@@ -34,6 +34,20 @@ const TEAM_OBJECTIONS_TOOL = {
   },
 };
 
+const TEAM_OBJECTION_LEADERBOARD_TOOL = {
+  name: 'read_team_objection_leaderboard',
+  description: 'Read verified per-closer handling rates for one canonical objection category. Use when asked which closer or closers handle a category best.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      category: { type: 'string', enum: CATEGORIES, description: 'The canonical Scout objection category to rank.' },
+      from: { type: 'string', description: 'ISO date-time. Omit to use the stated default window.' },
+      to: { type: 'string', description: 'ISO date-time. Omit to use the stated default window.' },
+    },
+    required: ['category'],
+  },
+};
+
 function textFrom(response) {
   return ((response && response.content) || [])
     .filter(function (block) { return block && block.type === 'text' && typeof block.text === 'string'; })
@@ -42,10 +56,10 @@ function textFrom(response) {
     .trim();
 }
 
-function firstToolUse(response) {
-  return ((response && response.content) || []).find(function (block) {
+function toolUses(response) {
+  return ((response && response.content) || []).filter(function (block) {
     return block && block.type === 'tool_use';
-  }) || null;
+  });
 }
 
 function rangeFor(input, defaults) {
@@ -81,6 +95,14 @@ function validTeamToolInput(input, profiles, defaults) {
   };
 }
 
+function validLeaderboardToolInput(input, profiles, defaults) {
+  var category = typeof (input || {}).category === 'string' ? input.category.trim().toLowerCase() : '';
+  if (CATEGORIES.indexOf(category) === -1) throw new Error('Scout AI needs a canonical objection category to rank closers.');
+  var namesByUserId = {};
+  (profiles || []).forEach(function (profile) { namesByUserId[profile.user_id] = profile.name; });
+  return { userIds: Object.keys(namesByUserId), namesByUserId: namesByUserId, category: category, range: rangeFor(input || {}, defaults) };
+}
+
 function systemPrompt(profiles, defaults) {
   var people = (profiles || []).map(function (profile) {
     return profile.user_id + ' — ' + profile.name;
@@ -94,6 +116,7 @@ function systemPrompt(profiles, defaults) {
     'Do not use Markdown, tables, headings, bullets, asterisks, or invented links. Write short plain sentences for Scout’s conversation view.',
     'The user can open the evidence cards Scout returns separately, so do not make up clips or quotes.',
     'For a team-wide objection question, distinguish the objection raised most often from the objection handled least often. They can be different.',
+    'For “who handles a category best,” use the team leaderboard tool once. Do not call one closer tool per person.',
     'Default date range: ' + defaults.from + ' through ' + defaults.to + '.',
     'Available closers (use only these ids):\n' + people,
   ].join('\n\n');
@@ -109,6 +132,9 @@ function evidenceFrom(facts) {
       least_handled: facts.least_handled,
       categories: facts.categories,
     };
+  }
+  if (facts && facts.kind === 'team_objection_leaderboard') {
+    return { kind: facts.kind, window: facts.window, category: facts.category, leaders: facts.leaders, handled_examples: facts.handled_examples };
   }
   return {
     kind: facts && facts.kind,
@@ -136,53 +162,90 @@ async function answerQuestion(options) {
     model: options.model,
     max_tokens: 700,
     system: systemPrompt(profiles, defaults),
-    tools: [COHORT_TOOL, TEAM_OBJECTIONS_TOOL],
+    tools: [COHORT_TOOL, TEAM_OBJECTIONS_TOOL, TEAM_OBJECTION_LEADERBOARD_TOOL],
     messages: messages,
   });
-  var tool = firstToolUse(first);
-  if (!tool) {
+  var requestedTools = toolUses(first);
+  if (!requestedTools.length) {
     return {
       status: 'unsupported',
       answer: textFrom(first) || 'Scout does not have an approved evidence tool for that question yet.',
       evidence: null,
     };
   }
-  var facts;
-  if (tool.name === COHORT_TOOL.name) {
-    var request = validToolInput(tool.input, profiles, defaults);
-    facts = await options.readObjectionCohort({
-      userId: request.userId,
-      from: request.range.from,
-      to: request.range.to,
-      filter: request.filter,
-    });
-  } else if (tool.name === TEAM_OBJECTIONS_TOOL.name) {
-    if (typeof options.readTeamObjections !== 'function') throw new Error('Scout AI is not configured.');
-    var teamRequest = validTeamToolInput(tool.input, profiles, defaults);
-    facts = await options.readTeamObjections({
-      userIds: teamRequest.userIds,
-      from: teamRequest.range.from,
-      to: teamRequest.range.to,
-    });
-  } else {
+  // Validate every requested tool before reading any fact. A made-up closer or
+  // unavailable tool must fail closed; a database read failure can be returned
+  // to the model as a normal tool error after the safe request is established.
+  var plans = requestedTools.map(function (tool) {
+    if (tool.name === COHORT_TOOL.name) {
+      return { kind: 'cohort', tool: tool, request: validToolInput(tool.input, profiles, defaults) };
+    }
+    if (tool.name === TEAM_OBJECTIONS_TOOL.name) {
+      if (typeof options.readTeamObjections !== 'function') throw new Error('Scout AI is not configured.');
+      return { kind: 'team', tool: tool, request: validTeamToolInput(tool.input, profiles, defaults) };
+    }
+    if (tool.name === TEAM_OBJECTION_LEADERBOARD_TOOL.name) {
+      if (typeof options.readTeamObjectionLeaderboard !== 'function') throw new Error('Scout AI is not configured.');
+      return { kind: 'leaderboard', tool: tool, request: validLeaderboardToolInput(tool.input, profiles, defaults) };
+    }
     throw new Error('Scout AI requested an unavailable tool.');
+  });
+  var facts = [];
+  var toolResults = [];
+  for (var i = 0; i < plans.length; i++) {
+    var plan = plans[i];
+    var tool = plan.tool;
+    try {
+      var fact;
+      if (plan.kind === 'cohort') {
+        var request = plan.request;
+        fact = await options.readObjectionCohort({
+          userId: request.userId,
+          from: request.range.from,
+          to: request.range.to,
+          filter: request.filter,
+        });
+      } else if (plan.kind === 'team') {
+        var teamRequest = plan.request;
+        fact = await options.readTeamObjections({
+          userIds: teamRequest.userIds,
+          from: teamRequest.range.from,
+          to: teamRequest.range.to,
+        });
+      } else {
+        var leaderboardRequest = plan.request;
+        fact = await options.readTeamObjectionLeaderboard({
+          userIds: leaderboardRequest.userIds,
+          namesByUserId: leaderboardRequest.namesByUserId,
+          category: leaderboardRequest.category,
+          from: leaderboardRequest.range.from,
+          to: leaderboardRequest.range.to,
+        });
+      }
+      facts.push(fact);
+      toolResults.push({ type: 'tool_result', tool_use_id: tool.id, content: JSON.stringify(fact) });
+    } catch (error) {
+      toolResults.push({ type: 'tool_result', tool_use_id: tool.id, is_error: true, content: (error && error.message) || 'Scout could not read that evidence.' });
+    }
   }
   messages.push({ role: 'assistant', content: first.content });
-  messages.push({ role: 'user', content: [{ type: 'tool_result', tool_use_id: tool.id, content: JSON.stringify(facts) }] });
+  messages.push({ role: 'user', content: toolResults });
   var final = await options.create({
     model: options.model,
     max_tokens: 700,
     system: systemPrompt(profiles, defaults),
-    tools: [COHORT_TOOL, TEAM_OBJECTIONS_TOOL],
+    tools: [COHORT_TOOL, TEAM_OBJECTIONS_TOOL, TEAM_OBJECTION_LEADERBOARD_TOOL],
     messages: messages,
   });
-  return { status: 'answered', answer: textFrom(final), evidence: evidenceFrom(facts) };
+  return { status: 'answered', answer: textFrom(final), evidence: facts.length ? evidenceFrom(facts[0]) : null };
 }
 
 module.exports = {
   COHORT_TOOL: COHORT_TOOL,
   TEAM_OBJECTIONS_TOOL: TEAM_OBJECTIONS_TOOL,
+  TEAM_OBJECTION_LEADERBOARD_TOOL: TEAM_OBJECTION_LEADERBOARD_TOOL,
   validToolInput: validToolInput,
   validTeamToolInput: validTeamToolInput,
+  validLeaderboardToolInput: validLeaderboardToolInput,
   answerQuestion: answerQuestion,
 };

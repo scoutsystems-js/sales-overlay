@@ -86,3 +86,15 @@ test('a team objection overview separates the most raised objection from the wea
   assert.equal(result.categories.fear.total, 2);
   assert.equal(result.categories.timing.total, 3);
 });
+
+test('a team objection leaderboard ranks saved handling by closer without counting disqualifications', () => {
+  const result = facts.summarizeTeamObjectionLeaderboard([
+    { type: 'objection', user_id: 'avery', fathom_call_id: 'a-1', objection_category: 'fear', objection_class: 'true_objection', resolution: 'handled' },
+    { type: 'objection', user_id: 'avery', fathom_call_id: 'a-2', objection_category: 'fear', objection_class: 'true_objection', resolution: 'unhandled' },
+    { type: 'objection', user_id: 'blake', fathom_call_id: 'b-1', objection_category: 'fear', objection_class: 'true_objection', resolution: 'handled' },
+    { type: 'objection', user_id: 'blake', fathom_call_id: 'b-dq', objection_category: 'fear', objection_class: 'disqualification', resolution: 'handled' },
+  ], {}, 'fear', { avery: 'Avery', blake: 'Blake' });
+  assert.deepEqual(result.leaders.map(row => [row.name, row.handled, row.total, row.rate]), [
+    ['Blake', 1, 1, 100], ['Avery', 1, 2, 50],
+  ]);
+});

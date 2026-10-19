@@ -13,5 +13,6 @@ test('Scout AI has a private question page, not a new dashboard metric', () => {
   assert.match(source, /\/scout-ai\/ask/);
   assert.match(source, /Evidence/i);
   assert.match(source, /Most raised objection/);
+  assert.match(source, /Best documented handlers/);
   assert.doesNotMatch(source, /spouse-objection cohort close rate/i);
 });

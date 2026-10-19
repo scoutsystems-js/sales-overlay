@@ -162,6 +162,34 @@ function summarizeTeamObjections(rows, outcomeByCall) {
   };
 }
 
+function summarizeTeamObjectionLeaderboard(rows, outcomeByCall, category, namesByUserId) {
+  var requestedCategory = normalizeText(category);
+  var grouped = {};
+  strictObjections(rows).forEach(function (row) {
+    if (normalizeText(row.objection_category) !== requestedCategory || !row.user_id) return;
+    if (!grouped[row.user_id]) grouped[row.user_id] = [];
+    grouped[row.user_id].push(row);
+  });
+  var leaders = Object.keys(grouped).map(function (userId) {
+    var counts = countObjections(grouped[userId], outcomeByCall);
+    return {
+      user_id: userId,
+      name: (namesByUserId && namesByUserId[userId]) || 'Closer name not recorded',
+      handled: counts.handled,
+      total: counts.total,
+      rate: counts.rate,
+    };
+  }).sort(function (a, b) {
+    return b.rate - a.rate || b.total - a.total || a.name.localeCompare(b.name);
+  });
+  return {
+    kind: 'team_objection_leaderboard',
+    category: requestedCategory,
+    leaders: leaders,
+    definition: 'closers ranked by documented objection handling rate for the requested category; handled means the saved moment was handled or its call closed',
+  };
+}
+
 module.exports = {
   matchesPhrase: matchesPhrase,
   matchesCohort: matchesCohort,
@@ -170,4 +198,5 @@ module.exports = {
   summarizeCohortCloseRate: summarizeCohortCloseRate,
   selectObjectionExamples: selectObjectionExamples,
   summarizeTeamObjections: summarizeTeamObjections,
+  summarizeTeamObjectionLeaderboard: summarizeTeamObjectionLeaderboard,
 };

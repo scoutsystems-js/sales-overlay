@@ -89,6 +89,43 @@ test('the model can read the team objection overview without inventing a closer 
   assert.equal(result.status, 'answered');
   assert.equal(reads.length, 1);
   assert.deepEqual(reads[0], { userIds: ['josh-id'], from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to });
-  assert.equal(requests[0].tools.length, 2);
+  assert.equal(requests[0].tools.length, 3);
   assert.equal(result.evidence.most_raised.category, 'timing');
+});
+
+test('every requested tool use receives a result before the model writes again', async () => {
+  const requests = [];
+  const responses = [
+    { content: [
+      { type: 'tool_use', id: 'tool-1', name: 'read_objection_cohort', input: { user_id: 'josh-id', category: 'fear' } },
+      { type: 'tool_use', id: 'tool-2', name: 'read_objection_cohort', input: { user_id: 'josh-id', category: 'timing' } },
+    ] },
+    { content: [{ type: 'text', text: 'Scout compared the requested saved facts.' }] },
+  ];
+  await answerQuestion({
+    question: 'Compare Josh’s fear and timing objections.',
+    profiles: PROFILES,
+    defaultRange: DEFAULT_RANGE,
+    model: 'fixture-model',
+    create: async request => { requests.push(request); return responses.shift(); },
+    readObjectionCohort: async input => Object.assign({}, FACTS, { filter: input.filter }),
+  });
+  assert.equal(requests[1].messages[2].content.length, 2);
+  assert.deepEqual(requests[1].messages[2].content.map(block => block.tool_use_id), ['tool-1', 'tool-2']);
+});
+
+test('the model uses one team leaderboard for best handling by objection category', async () => {
+  const responses = [
+    { content: [{ type: 'tool_use', id: 'tool-rank', name: 'read_team_objection_leaderboard', input: { category: 'fear' } }] },
+    { content: [{ type: 'text', text: 'Josh handled Fear objections best in this range.' }] },
+  ];
+  const reads = [];
+  const result = await answerQuestion({
+    question: 'What closers handle fear objections best?', profiles: PROFILES, defaultRange: DEFAULT_RANGE, model: 'fixture-model',
+    create: async () => responses.shift(), readObjectionCohort: async () => FACTS,
+    readTeamObjections: async () => { throw new Error('wrong reader'); },
+    readTeamObjectionLeaderboard: async request => { reads.push(request); return { kind: 'team_objection_leaderboard', category: 'fear', window: DEFAULT_RANGE, leaders: [{ user_id: 'josh-id', name: 'Josh P', handled: 3, total: 4, rate: 75 }] }; },
+  });
+  assert.deepEqual(reads[0], { userIds: ['josh-id'], namesByUserId: { 'josh-id': 'Josh P' }, category: 'fear', from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to });
+  assert.equal(result.evidence.leaders[0].rate, 75);
 });
