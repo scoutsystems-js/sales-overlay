@@ -89,7 +89,7 @@ test('the model can read the team objection overview without inventing a closer 
   assert.equal(result.status, 'answered');
   assert.equal(reads.length, 1);
   assert.deepEqual(reads[0], { userIds: ['josh-id'], from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to });
-  assert.equal(requests[0].tools.length, 7);
+  assert.equal(requests[0].tools.length, 8);
   assert.equal(result.evidence.most_raised.category, 'timing');
 });
 
@@ -191,6 +191,39 @@ test('the model can return a closer’s saved Discovery exchange without inventi
   });
   assert.deepEqual(reads, [{ userIds: ['josh-id'], namesByUserId: { 'josh-id': 'Josh P' }, userId: 'josh-id', stage: 'discovery', from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to }]);
   assert.equal(result.evidence.kind, 'stage_examples');
+});
+
+test('the model can return real recent not-handled objection calls instead of refusing the question', async () => {
+  const reads = [];
+  const responses = [
+    { content: [{ type: 'tool_use', id: 'tool-calls', name: 'read_call_examples', input: { user_id: 'josh-id', category: 'partner', handling: 'not_handled', limit: 5 } }] },
+    { content: [{ type: 'text', text: 'Scout found one recent Partner objection that was not handled for Josh.' }] },
+  ];
+  const result = await answerQuestion({
+    question: 'Give me five recent examples of Josh failing to handle a Partner objection.', profiles: PROFILES, defaultRange: DEFAULT_RANGE, model: 'fixture-model',
+    create: async () => responses.shift(), readObjectionCohort: async () => FACTS,
+    readCallExamples: async request => {
+      reads.push(request);
+      return { kind: 'call_examples', window: DEFAULT_RANGE, calls: [{ call_id: 'call-1', outcome: 'lost', objection: { category: 'partner', resolution: 'unhandled' } }] };
+    },
+  });
+  assert.deepEqual(reads, [{ userId: 'josh-id', filter: { phrase: null, category: 'partner', handling: 'not_handled', outcome: null }, limit: 5, from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to }]);
+  assert.equal(result.evidence.kind, 'call_examples');
+  assert.equal(result.evidence.calls[0].objection.resolution, 'unhandled');
+});
+
+test('the model can return real recent calls that did not close using the existing outcome filter', async () => {
+  const reads = [];
+  const responses = [
+    { content: [{ type: 'tool_use', id: 'tool-calls', name: 'read_call_examples', input: { user_id: 'josh-id', outcome: 'not_closed', limit: 5 } }] },
+    { content: [{ type: 'text', text: 'Scout found five recent calls for Josh that did not close on that call.' }] },
+  ];
+  await answerQuestion({
+    question: 'Give me the last five calls Josh took that did not close.', profiles: PROFILES, defaultRange: DEFAULT_RANGE, model: 'fixture-model',
+    create: async () => responses.shift(), readObjectionCohort: async () => FACTS,
+    readCallExamples: async request => { reads.push(request); return { kind: 'call_examples', window: DEFAULT_RANGE, calls: [] }; },
+  });
+  assert.deepEqual(reads, [{ userId: 'josh-id', filter: { phrase: null, category: null, handling: null, outcome: 'not_closed' }, limit: 5, from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to }]);
 });
 
 test('the model can compare one closer’s saved handled and not-handled objection patterns', async () => {

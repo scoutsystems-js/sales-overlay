@@ -108,7 +108,26 @@ const STAGE_EXAMPLES_TOOL = {
   },
 };
 
-const SCOUT_TOOLS = [COHORT_TOOL, OBJECTION_COACHING_COMPARISON_TOOL, TEAM_OBJECTIONS_TOOL, TEAM_OBJECTION_LEADERBOARD_TOOL, CLOSER_CLOSE_RATE_TOOL, STAGE_PERFORMANCE_TOOL, STAGE_EXAMPLES_TOOL];
+const CALL_EXAMPLES_TOOL = {
+  name: 'read_call_examples',
+  description: 'Read up to five real calls for one closer using existing Scout Calls and Objections records. Use for requests to show recent handled or not-handled objection calls, or calls that closed or did not close. “Not closed” means a completed analysis with an outcome other than closed; ungraded calls are excluded.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      user_id: { type: 'string', description: 'One id from the available closer list.' },
+      phrase: { type: 'string', description: 'Exact objection phrase to match. Omit if category is used.' },
+      category: { type: 'string', enum: CATEGORIES, description: 'Canonical Scout objection category. Needed when requesting handled or not-handled objection calls.' },
+      handling: { type: 'string', enum: ['handled', 'not_handled'], description: 'Use only with an objection phrase or category.' },
+      outcome: { type: 'string', enum: ['closed', 'not_closed'], description: 'Use not_closed for calls that did not close on that call.' },
+      limit: { type: 'integer', minimum: 1, maximum: 5, description: 'How many calls to return, up to five.' },
+      from: { type: 'string', description: 'ISO date-time. Omit to use the stated default window.' },
+      to: { type: 'string', description: 'ISO date-time. Omit to use the stated default window.' },
+    },
+    required: ['user_id'],
+  },
+};
+
+const SCOUT_TOOLS = [COHORT_TOOL, OBJECTION_COACHING_COMPARISON_TOOL, TEAM_OBJECTIONS_TOOL, TEAM_OBJECTION_LEADERBOARD_TOOL, CLOSER_CLOSE_RATE_TOOL, STAGE_PERFORMANCE_TOOL, STAGE_EXAMPLES_TOOL, CALL_EXAMPLES_TOOL];
 
 function textFrom(response) {
   return ((response && response.content) || [])
@@ -228,6 +247,26 @@ function validStageExamplesToolInput(input, profiles, defaults) {
   };
 }
 
+function validCallExamplesToolInput(input, profiles, defaults) {
+  input = input || {};
+  var userId = input.user_id;
+  if (!(profiles || []).some(function (profile) { return profile.user_id === userId; })) throw new Error('Scout AI could not match that closer.');
+  var phrase = typeof input.phrase === 'string' ? input.phrase.trim() : '';
+  var category = typeof input.category === 'string' ? input.category.trim().toLowerCase() : '';
+  var handling = input.handling === 'handled' || input.handling === 'not_handled' ? input.handling : null;
+  var outcome = input.outcome === 'closed' || input.outcome === 'not_closed' ? input.outcome : null;
+  var limit = Number(input.limit == null ? 5 : input.limit);
+  if (!phrase && CATEGORIES.indexOf(category) === -1 && !outcome) throw new Error('Scout AI needs an outcome, objection phrase, or category for those calls.');
+  if (handling && !phrase && CATEGORIES.indexOf(category) === -1) throw new Error('Scout AI needs an objection phrase or category to filter handling.');
+  if (!Number.isInteger(limit) || limit < 1 || limit > 5) throw new Error('Scout AI can return between one and five calls.');
+  return {
+    userId: userId,
+    filter: { phrase: phrase || null, category: CATEGORIES.indexOf(category) !== -1 ? category : null, handling: handling, outcome: outcome },
+    limit: limit,
+    range: rangeFor(input, defaults),
+  };
+}
+
 function systemPrompt(profiles, defaults) {
   var people = (profiles || []).map(function (profile) {
     return profile.user_id + ' — ' + profile.name;
@@ -245,6 +284,7 @@ function systemPrompt(profiles, defaults) {
     'For “what does a closer do when an objection works versus when it does not,” use the objection-coaching-comparison tool once for that closer and category. State only the saved repeated patterns it returns; never add a cause, outcome, or pattern that is not present.',
     'For an overall close-rate question, use the closer close-rate tool. For “who needs help with Discovery/Pitch/Close/Intro/Objection Handling,” use the stage-performance tool with that stage and explain that only sufficiently measured scores are ranked. For “who needs the most coaching overall,” use the stage-performance tool exactly once with no stage and no closer, then state the returned priority directly; do not split it into separate stage reads or call a partial result an overall answer.',
     'For a request to show saved calls or examples for Discovery, Pitch, or Close, use the stage-examples tool. Describe only the saved exchange; never say it caused a grade, handling result, or call outcome.',
+    'For a request to show specific recent objection calls or calls by outcome, use the call-examples tool. Return the available real calls directly. Do not refuse by describing a tool limitation. A saved objection exchange can support an objection request; a plain outcome result must not be treated as proof of why a call ended that way.',
     'Default date range: ' + defaults.from + ' through ' + defaults.to + '.',
     'Available closers (use only these ids):\n' + people,
   ].join('\n\n');
@@ -260,6 +300,9 @@ function evidenceFrom(facts) {
   }
   if (facts && facts.kind === 'stage_examples') {
     return { kind: facts.kind, window: facts.window, stage: facts.stage, examples: facts.examples };
+  }
+  if (facts && facts.kind === 'call_examples') {
+    return { kind: facts.kind, window: facts.window, filter: facts.filter, calls_in_window: facts.calls_in_window, calls: facts.calls };
   }
   if (facts && facts.kind === 'closer_close_rate') {
     return { kind: facts.kind, window: facts.window, close_rate: facts.close_rate };
@@ -353,6 +396,10 @@ async function answerQuestion(options) {
       if (typeof options.readStageExamples !== 'function') throw new Error('Scout AI is not configured.');
       return { kind: 'stage-examples', tool: tool, request: validStageExamplesToolInput(tool.input, profiles, defaults) };
     }
+    if (tool.name === CALL_EXAMPLES_TOOL.name) {
+      if (typeof options.readCallExamples !== 'function') throw new Error('Scout AI is not configured.');
+      return { kind: 'call-examples', tool: tool, request: validCallExamplesToolInput(tool.input, profiles, defaults) };
+    }
     throw new Error('Scout AI requested an unavailable tool.');
   });
   var facts = [];
@@ -412,7 +459,7 @@ async function answerQuestion(options) {
           from: stageRequest.range.from,
           to: stageRequest.range.to,
         });
-      } else {
+      } else if (plan.kind === 'stage-examples') {
         var exampleRequest = plan.request;
         fact = await options.readStageExamples({
           userIds: exampleRequest.userIds,
@@ -421,6 +468,15 @@ async function answerQuestion(options) {
           stage: exampleRequest.stage,
           from: exampleRequest.range.from,
           to: exampleRequest.range.to,
+        });
+      } else {
+        var callExamplesRequest = plan.request;
+        fact = await options.readCallExamples({
+          userId: callExamplesRequest.userId,
+          filter: callExamplesRequest.filter,
+          limit: callExamplesRequest.limit,
+          from: callExamplesRequest.range.from,
+          to: callExamplesRequest.range.to,
         });
       }
       facts.push(fact);
@@ -449,6 +505,7 @@ module.exports = {
   CLOSER_CLOSE_RATE_TOOL: CLOSER_CLOSE_RATE_TOOL,
   STAGE_PERFORMANCE_TOOL: STAGE_PERFORMANCE_TOOL,
   STAGE_EXAMPLES_TOOL: STAGE_EXAMPLES_TOOL,
+  CALL_EXAMPLES_TOOL: CALL_EXAMPLES_TOOL,
   validToolInput: validToolInput,
   validCoachingComparisonToolInput: validCoachingComparisonToolInput,
   validTeamToolInput: validTeamToolInput,
@@ -456,5 +513,6 @@ module.exports = {
   validCloseRateToolInput: validCloseRateToolInput,
   validStagePerformanceToolInput: validStagePerformanceToolInput,
   validStageExamplesToolInput: validStageExamplesToolInput,
+  validCallExamplesToolInput: validCallExamplesToolInput,
   answerQuestion: answerQuestion,
 };

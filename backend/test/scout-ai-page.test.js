@@ -51,3 +51,11 @@ test('a saved objection comparison shows both grounded patterns and the supporti
   assert.match(source, /When it works/);
   assert.match(source, /When it is not handled/);
 });
+
+test('call-search answers render the existing call outcome and links, without inventing an exchange', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'web', 'scout-ai.html'), 'utf8');
+  assert.match(source, /evidence\.kind === 'call_examples'/);
+  assert.match(source, /call\.outcome/);
+  assert.match(source, /Open call review/);
+  assert.match(source, /Watch clip/);
+});

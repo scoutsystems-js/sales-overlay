@@ -49,6 +49,28 @@ function validateStageRequest(input) {
   return input;
 }
 
+function validateCallExamplesRequest(input) {
+  input = input || {};
+  if (!input.userId || typeof input.userId !== 'string') throw new Error('A closer is required.');
+  if (!validIso(input.from) || !validIso(input.to) || input.from > input.to) throw new Error('A valid date range is required.');
+  var filter = input.filter || {};
+  var phrase = typeof filter.phrase === 'string' ? filter.phrase.trim() : '';
+  var category = typeof filter.category === 'string' ? filter.category.trim().toLowerCase() : '';
+  var handling = filter.handling === 'handled' || filter.handling === 'not_handled' ? filter.handling : null;
+  var outcome = filter.outcome === 'closed' || filter.outcome === 'not_closed' ? filter.outcome : null;
+  if (!phrase && !category && !outcome) throw new Error('An outcome, objection phrase, or objection category is required.');
+  if (handling && !phrase && !category) throw new Error('Objection handling needs an objection phrase or category.');
+  var limit = Number(input.limit);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 5) throw new Error('Choose between one and five calls.');
+  return {
+    userId: input.userId,
+    from: input.from,
+    to: input.to,
+    filter: { phrase: phrase || null, category: category || null, handling: handling, outcome: outcome },
+    limit: limit,
+  };
+}
+
 async function paged(read) {
   var out = [];
   for (var page = 0; page < MAX_PAGES; page++) {
@@ -112,7 +134,7 @@ async function analysesForCalls(admin, callIds) {
   if (!callIds.length) return [];
   return chunked(callIds, function (ids) {
     return admin.from('call_analyses')
-      .select('fathom_call_id, outcome, status')
+      .select('fathom_call_id, outcome, prospect_name, status')
       .in('fathom_call_id', ids)
       .eq('status', 'done');
   });
@@ -198,6 +220,60 @@ async function readObjectionCohort(admin, request) {
     close_rate: facts.summarizeCohortCloseRate(moments, allCalls, input.filter),
     handled_examples: facts.selectObjectionExamples(moments, callsById(windowCalls), input.filter, 'handled'),
     not_handled_examples: facts.selectObjectionExamples(moments, callsById(windowCalls), input.filter, 'not_handled'),
+  };
+}
+
+// This reader is the conversational form of existing Calls and Objections
+// records. It does not analyze calls or infer an explanation: it returns only
+// saved outcomes and, where requested, the exact saved objection moment.
+async function readCallExamples(admin, request) {
+  var input = validateCallExamplesRequest(request);
+  var calls = await callsInWindow(admin, input);
+  var analyses = await analysesForCalls(admin, calls.map(function (call) { return call.id; }));
+  var outcomes = outcomesByCall(analyses);
+  var analysisByCall = {};
+  analyses.forEach(function (analysis) { analysisByCall[analysis.fathom_call_id] = analysis; });
+  var momentsByCall = {};
+  if (input.filter.phrase || input.filter.category) {
+    facts.cohortRows(await highlightsForCalls(admin, calls.map(function (call) { return call.id; })), input.filter)
+      .forEach(function (moment) {
+        if (!momentsByCall[moment.fathom_call_id]) momentsByCall[moment.fathom_call_id] = [];
+        momentsByCall[moment.fathom_call_id].push(moment);
+      });
+  }
+  var examples = calls.map(function (call) {
+    var outcome = outcomes[call.id] || null;
+    if (input.filter.outcome === 'closed' && outcome !== 'closed') return null;
+    if (input.filter.outcome === 'not_closed' && (!outcome || outcome === 'closed')) return null;
+    var moments = momentsByCall[call.id] || [];
+    var moment = moments.find(function (item) {
+      if (input.filter.handling === 'handled') return item.resolution === 'handled';
+      if (input.filter.handling === 'not_handled') return item.resolution === 'partial' || item.resolution === 'unhandled';
+      return true;
+    });
+    if ((input.filter.phrase || input.filter.category) && !moment) return null;
+    return {
+      call_id: call.id,
+      prospect_name: (analysisByCall[call.id] && analysisByCall[call.id].prospect_name) || call.title || null,
+      call_date: call.call_date || null,
+      recording_url: call.recording_url || null,
+      outcome: outcome,
+      objection: moment ? {
+        quote: moment.quote || null,
+        category: moment.objection_category || null,
+        resolution: moment.resolution || null,
+        timestamp_seconds: Number.isFinite(moment.timestamp_seconds) ? moment.timestamp_seconds : null,
+      } : null,
+    };
+  }).filter(Boolean).sort(function (left, right) {
+    return String(right.call_date || '').localeCompare(String(left.call_date || '')) || left.call_id.localeCompare(right.call_id);
+  }).slice(0, input.limit);
+  return {
+    kind: 'call_examples',
+    window: { from: input.from, to: input.to },
+    filter: input.filter,
+    calls_in_window: calls.length,
+    calls: examples,
   };
 }
 
@@ -422,6 +498,7 @@ module.exports = {
   validateTeamRequest: validateTeamRequest,
   validateStageRequest: validateStageRequest,
   readObjectionCohort: readObjectionCohort,
+  readCallExamples: readCallExamples,
   readObjectionCoachingComparison: readObjectionCoachingComparison,
   readTeamObjections: readTeamObjections,
   readTeamObjectionLeaderboard: readTeamObjectionLeaderboard,

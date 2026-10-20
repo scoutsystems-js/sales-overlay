@@ -14,7 +14,7 @@ test('Scout AI has a bounded database reader before a question route can exist',
   );
 });
 
-const { readObjectionCohort, readTeamObjections, readTeamObjectionLeaderboard, readCloserCloseRate, readStagePerformance, readStageExamples } = require('../lib/scout-ai-reader');
+const { readObjectionCohort, readTeamObjections, readTeamObjectionLeaderboard, readCloserCloseRate, readStagePerformance, readStageExamples, readCallExamples } = require('../lib/scout-ai-reader');
 const { comparisonFromSavedCoaching } = require('../lib/scout-ai-coaching-comparison');
 
 const CALLS = [
@@ -209,4 +209,44 @@ test('the bounded reader returns only a saved, verified exchange for the request
   ]);
   assert.equal(result.examples[0].prospect_name, 'Avery');
   assert.equal(result.examples[0].recording_url, 'https://recording.example/spouse');
+});
+
+test('the bounded reader returns real not-handled Partner calls with their existing outcomes', async () => {
+  const result = await readCallExamples(fakeAdmin(), {
+    userId: 'josh',
+    from: '2026-10-01T00:00:00Z',
+    to: '2026-10-05T00:00:00Z',
+    filter: { category: 'partner', handling: 'not_handled' },
+    limit: 5,
+  });
+  assert.equal(result.kind, 'call_examples');
+  assert.equal(result.calls.length, 1);
+  assert.deepEqual(result.calls[0], {
+    call_id: 'call-partner',
+    prospect_name: 'Blake',
+    call_date: '2026-10-03T12:00:00Z',
+    recording_url: 'https://recording.example/partner',
+    outcome: 'lost',
+    objection: {
+      quote: 'I need to speak with my business partner.',
+      category: 'partner',
+      resolution: 'unhandled',
+      timestamp_seconds: 110,
+    },
+  });
+});
+
+test('the bounded reader uses the Calls page not-closed definition and excludes ungraded calls', async () => {
+  const result = await readCallExamples(fakeAdmin(), {
+    userId: 'josh',
+    from: '2026-10-01T00:00:00Z',
+    to: '2026-10-05T00:00:00Z',
+    filter: { outcome: 'not_closed' },
+    limit: 5,
+  });
+  assert.equal(result.calls.length, 2);
+  assert.deepEqual(result.calls.map(function (call) { return [call.call_id, call.outcome]; }).sort(), [
+    ['call-partner', 'lost'], ['call-spouse', 'lost'],
+  ]);
+  assert.ok(result.calls.every(function (call) { return call.outcome !== 'closed'; }));
 });
