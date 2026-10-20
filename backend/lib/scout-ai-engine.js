@@ -110,7 +110,7 @@ const STAGE_EXAMPLES_TOOL = {
 
 const CALL_EXAMPLES_TOOL = {
   name: 'read_call_examples',
-  description: 'Read up to five real calls for one closer using existing Scout Calls and Objections records. Use for requests to show recent handled or not-handled objection calls, or calls that closed or did not close. “Not closed” means a completed analysis with an outcome other than closed; ungraded calls are excluded.',
+  description: 'Read up to five real calls for one closer using existing Scout Calls and Objections records. Outcomes are distinct: lost is a deal that ended without a path forward, follow_up is still open, and no_show had no meaningful conversation. For the exact phrase “not closed,” return a breakdown first instead of mixing those outcomes into one call list.',
   input_schema: {
     type: 'object',
     properties: {
@@ -118,7 +118,7 @@ const CALL_EXAMPLES_TOOL = {
       phrase: { type: 'string', description: 'Exact objection phrase to match. Omit if category is used.' },
       category: { type: 'string', enum: CATEGORIES, description: 'Canonical Scout objection category. Needed when requesting handled or not-handled objection calls.' },
       handling: { type: 'string', enum: ['handled', 'not_handled'], description: 'Use only with an objection phrase or category.' },
-      outcome: { type: 'string', enum: ['closed', 'not_closed'], description: 'Use not_closed for calls that did not close on that call.' },
+      outcome: { type: 'string', enum: ['closed', 'follow_up', 'lost', 'no_show', 'not_closed'], description: 'Use lost for “did not close,” “failed to close,” or “lost.” Use follow_up for still-open calls and no_show only for no-shows. Use not_closed only when the user explicitly says “not closed”; it returns a breakdown, not a blended call list.' },
       limit: { type: 'integer', minimum: 1, maximum: 5, description: 'How many calls to return, up to five.' },
       from: { type: 'string', description: 'ISO date-time. Omit to use the stated default window.' },
       to: { type: 'string', description: 'ISO date-time. Omit to use the stated default window.' },
@@ -254,7 +254,7 @@ function validCallExamplesToolInput(input, profiles, defaults) {
   var phrase = typeof input.phrase === 'string' ? input.phrase.trim() : '';
   var category = typeof input.category === 'string' ? input.category.trim().toLowerCase() : '';
   var handling = input.handling === 'handled' || input.handling === 'not_handled' ? input.handling : null;
-  var outcome = input.outcome === 'closed' || input.outcome === 'not_closed' ? input.outcome : null;
+  var outcome = ['closed', 'follow_up', 'lost', 'no_show', 'not_closed'].indexOf(input.outcome) !== -1 ? input.outcome : null;
   var limit = Number(input.limit == null ? 5 : input.limit);
   if (!phrase && CATEGORIES.indexOf(category) === -1 && !outcome) throw new Error('Scout AI needs an outcome, objection phrase, or category for those calls.');
   if (handling && !phrase && CATEGORIES.indexOf(category) === -1) throw new Error('Scout AI needs an objection phrase or category to filter handling.');
@@ -284,7 +284,7 @@ function systemPrompt(profiles, defaults) {
     'For “what does a closer do when an objection works versus when it does not,” use the objection-coaching-comparison tool once for that closer and category. State only the saved repeated patterns it returns; never add a cause, outcome, or pattern that is not present.',
     'For an overall close-rate question, use the closer close-rate tool. For “who needs help with Discovery/Pitch/Close/Intro/Objection Handling,” use the stage-performance tool with that stage and explain that only sufficiently measured scores are ranked. For “who needs the most coaching overall,” use the stage-performance tool exactly once with no stage and no closer, then state the returned priority directly; do not split it into separate stage reads or call a partial result an overall answer.',
     'For a request to show saved calls or examples for Discovery, Pitch, or Close, use the stage-examples tool. Describe only the saved exchange; never say it caused a grade, handling result, or call outcome.',
-    'For a request to show specific recent objection calls or calls by outcome, use the call-examples tool. Return the available real calls directly. Do not refuse by describing a tool limitation. A saved objection exchange can support an objection request; a plain outcome result must not be treated as proof of why a call ended that way.',
+    'For a request to show specific recent objection calls or calls by outcome, use the call-examples tool. Return the available real calls directly. Do not refuse by describing a tool limitation. “Did not close,” “failed to close,” and “lost” mean lost only. Open follow-ups and no-shows are different outcomes and must never be called lost. For the exact phrase “not closed,” report the returned Lost, Open, and No-show breakdown and ask which group they want to review. A saved objection exchange can support an objection request; a plain outcome result must not be treated as proof of why a call ended that way.',
     'Default date range: ' + defaults.from + ' through ' + defaults.to + '.',
     'Available closers (use only these ids):\n' + people,
   ].join('\n\n');
@@ -302,7 +302,15 @@ function evidenceFrom(facts) {
     return { kind: facts.kind, window: facts.window, stage: facts.stage, examples: facts.examples };
   }
   if (facts && facts.kind === 'call_examples') {
-    return { kind: facts.kind, window: facts.window, filter: facts.filter, calls_in_window: facts.calls_in_window, calls: facts.calls };
+    return {
+      kind: facts.kind,
+      window: facts.window,
+      filter: facts.filter,
+      matching_call_count: facts.matching_call_count,
+      outcome_breakdown: facts.outcome_breakdown,
+      needs_outcome_choice: facts.needs_outcome_choice,
+      calls: facts.calls,
+    };
   }
   if (facts && facts.kind === 'closer_close_rate') {
     return { kind: facts.kind, window: facts.window, close_rate: facts.close_rate };

@@ -21,6 +21,8 @@ const CALLS = [
   { id: 'call-spouse', user_id: 'josh', fathom_call_id: 'real-spouse', prospect_id: 'prospect-spouse', title: 'Avery', call_date: '2026-10-02T12:00:00Z', recording_url: 'https://recording.example/spouse', not_a_sales_call: false, duplicate_of: null },
   { id: 'call-spouse-followup', user_id: 'josh', fathom_call_id: 'real-spouse-followup', prospect_id: 'prospect-spouse', title: 'Avery', call_date: '2026-10-10T12:00:00Z', recording_url: 'https://recording.example/followup', not_a_sales_call: false, duplicate_of: null },
   { id: 'call-partner', user_id: 'josh', fathom_call_id: 'real-partner', prospect_id: 'prospect-partner', title: 'Blake', call_date: '2026-10-03T12:00:00Z', recording_url: 'https://recording.example/partner', not_a_sales_call: false, duplicate_of: null },
+  { id: 'call-open', user_id: 'josh', fathom_call_id: 'real-open', prospect_id: 'prospect-spouse', title: 'Casey', call_date: '2026-10-04T12:00:00Z', recording_url: 'https://recording.example/open', not_a_sales_call: false, duplicate_of: null },
+  { id: 'call-no-show', user_id: 'josh', fathom_call_id: 'real-no-show', prospect_id: 'prospect-no-show', title: 'Morning meeting', call_date: '2026-10-05T12:00:00Z', recording_url: null, not_a_sales_call: false, duplicate_of: null },
   { id: 'demo-copy', user_id: 'josh', fathom_call_id: 'demo-copy', prospect_id: 'demo-prospect', title: 'Demo', call_date: '2026-10-03T12:00:00Z', recording_url: null, not_a_sales_call: false, duplicate_of: null },
 ];
 const HIGHLIGHTS = [
@@ -33,6 +35,8 @@ const ANALYSES = [
   { fathom_call_id: 'call-spouse', outcome: 'lost', status: 'done' },
   { fathom_call_id: 'call-spouse-followup', outcome: 'closed', status: 'done' },
   { fathom_call_id: 'call-partner', outcome: 'lost', status: 'done' },
+  { fathom_call_id: 'call-open', outcome: 'follow_up', status: 'done' },
+  { fathom_call_id: 'call-no-show', outcome: 'no_show', status: 'done' },
 ];
 
 function fakeAdmin() {
@@ -67,7 +71,7 @@ test('the bounded reader returns only exact spouse evidence and its linked close
   const result = await readObjectionCohort(fakeAdmin(), {
     userId: 'josh',
     from: '2026-10-01T00:00:00Z',
-    to: '2026-10-05T00:00:00Z',
+    to: '2026-10-05T23:59:59Z',
     filter: { phrase: 'spouse' },
   });
   assert.equal(result.matching_moments, 1);
@@ -236,17 +240,33 @@ test('the bounded reader returns real not-handled Partner calls with their exist
   });
 });
 
-test('the bounded reader uses the Calls page not-closed definition and excludes ungraded calls', async () => {
+test('the bounded reader treats a request for calls that did not close as Lost calls only', async () => {
   const result = await readCallExamples(fakeAdmin(), {
     userId: 'josh',
     from: '2026-10-01T00:00:00Z',
     to: '2026-10-05T00:00:00Z',
-    filter: { outcome: 'not_closed' },
+    filter: { outcome: 'lost' },
     limit: 5,
   });
   assert.equal(result.calls.length, 2);
+  assert.equal(result.matching_call_count, 2);
   assert.deepEqual(result.calls.map(function (call) { return [call.call_id, call.outcome]; }).sort(), [
     ['call-partner', 'lost'], ['call-spouse', 'lost'],
   ]);
-  assert.ok(result.calls.every(function (call) { return call.outcome !== 'closed'; }));
+  assert.ok(result.calls.every(function (call) { return call.outcome === 'lost'; }));
+  assert.ok(result.calls.every(function (call) { return call.call_id !== 'call-open' && call.call_id !== 'call-no-show'; }));
+});
+
+test('the bounded reader keeps an exact not-closed request as an outcome breakdown, not a blended list', async () => {
+  const result = await readCallExamples(fakeAdmin(), {
+    userId: 'josh',
+    from: '2026-10-01T00:00:00Z',
+    to: '2026-10-05T23:59:59Z',
+    filter: { outcome: 'not_closed' },
+    limit: 5,
+  });
+  assert.equal(result.matching_call_count, 4);
+  assert.equal(result.needs_outcome_choice, true);
+  assert.deepEqual(result.outcome_breakdown, { lost: 2, follow_up: 1, no_show: 1 });
+  assert.deepEqual(result.calls, []);
 });

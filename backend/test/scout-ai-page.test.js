@@ -58,4 +58,6 @@ test('call-search answers render the existing call outcome and links, without in
   assert.match(source, /call\.outcome/);
   assert.match(source, /Open call review/);
   assert.match(source, /Watch clip/);
+  assert.match(source, /follow_up:'Open'/);
+  assert.doesNotMatch(source, /Follow-up \/ open/);
 });

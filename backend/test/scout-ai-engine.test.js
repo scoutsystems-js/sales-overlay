@@ -212,10 +212,10 @@ test('the model can return real recent not-handled objection calls instead of re
   assert.equal(result.evidence.calls[0].objection.resolution, 'unhandled');
 });
 
-test('the model can return real recent calls that did not close using the existing outcome filter', async () => {
+test('the model translates calls that did not close into Lost calls, not a mixed outcome list', async () => {
   const reads = [];
   const responses = [
-    { content: [{ type: 'tool_use', id: 'tool-calls', name: 'read_call_examples', input: { user_id: 'josh-id', outcome: 'not_closed', limit: 5 } }] },
+    { content: [{ type: 'tool_use', id: 'tool-calls', name: 'read_call_examples', input: { user_id: 'josh-id', outcome: 'lost', limit: 5 } }] },
     { content: [{ type: 'text', text: 'Scout found five recent calls for Josh that did not close on that call.' }] },
   ];
   await answerQuestion({
@@ -223,7 +223,7 @@ test('the model can return real recent calls that did not close using the existi
     create: async () => responses.shift(), readObjectionCohort: async () => FACTS,
     readCallExamples: async request => { reads.push(request); return { kind: 'call_examples', window: DEFAULT_RANGE, calls: [] }; },
   });
-  assert.deepEqual(reads, [{ userId: 'josh-id', filter: { phrase: null, category: null, handling: null, outcome: 'not_closed' }, limit: 5, from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to }]);
+  assert.deepEqual(reads, [{ userId: 'josh-id', filter: { phrase: null, category: null, handling: null, outcome: 'lost' }, limit: 5, from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to }]);
 });
 
 test('the model can compare one closer’s saved handled and not-handled objection patterns', async () => {

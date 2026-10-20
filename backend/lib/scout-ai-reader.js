@@ -21,6 +21,7 @@ var EVIDENCE_LABELS = {
   pitch: ['Prospect question', 'Closer explains', 'Prospect confirmation'],
   close: ['Closer asks', 'Prospect response', 'Closer next move'],
 };
+var CALL_EXAMPLE_OUTCOMES = ['closed', 'follow_up', 'lost', 'no_show', 'not_closed'];
 
 function validIso(value) {
   return typeof value === 'string' && !isNaN(Date.parse(value));
@@ -57,7 +58,7 @@ function validateCallExamplesRequest(input) {
   var phrase = typeof filter.phrase === 'string' ? filter.phrase.trim() : '';
   var category = typeof filter.category === 'string' ? filter.category.trim().toLowerCase() : '';
   var handling = filter.handling === 'handled' || filter.handling === 'not_handled' ? filter.handling : null;
-  var outcome = filter.outcome === 'closed' || filter.outcome === 'not_closed' ? filter.outcome : null;
+  var outcome = CALL_EXAMPLE_OUTCOMES.indexOf(filter.outcome) !== -1 ? filter.outcome : null;
   if (!phrase && !category && !outcome) throw new Error('An outcome, objection phrase, or objection category is required.');
   if (handling && !phrase && !category) throw new Error('Objection handling needs an objection phrase or category.');
   var limit = Number(input.limit);
@@ -241,10 +242,10 @@ async function readCallExamples(admin, request) {
         momentsByCall[moment.fathom_call_id].push(moment);
       });
   }
-  var examples = calls.map(function (call) {
+  var matches = calls.map(function (call) {
     var outcome = outcomes[call.id] || null;
-    if (input.filter.outcome === 'closed' && outcome !== 'closed') return null;
     if (input.filter.outcome === 'not_closed' && (!outcome || outcome === 'closed')) return null;
+    if (input.filter.outcome && input.filter.outcome !== 'not_closed' && outcome !== input.filter.outcome) return null;
     var moments = momentsByCall[call.id] || [];
     var moment = moments.find(function (item) {
       if (input.filter.handling === 'handled') return item.resolution === 'handled';
@@ -267,13 +268,20 @@ async function readCallExamples(admin, request) {
     };
   }).filter(Boolean).sort(function (left, right) {
     return String(right.call_date || '').localeCompare(String(left.call_date || '')) || left.call_id.localeCompare(right.call_id);
-  }).slice(0, input.limit);
+  });
+  var outcomeBreakdown = input.filter.outcome === 'not_closed' ? {
+    lost: matches.filter(function (call) { return call.outcome === 'lost'; }).length,
+    follow_up: matches.filter(function (call) { return call.outcome === 'follow_up'; }).length,
+    no_show: matches.filter(function (call) { return call.outcome === 'no_show'; }).length,
+  } : null;
   return {
     kind: 'call_examples',
     window: { from: input.from, to: input.to },
     filter: input.filter,
-    calls_in_window: calls.length,
-    calls: examples,
+    matching_call_count: matches.length,
+    outcome_breakdown: outcomeBreakdown,
+    needs_outcome_choice: input.filter.outcome === 'not_closed',
+    calls: input.filter.outcome === 'not_closed' ? [] : matches.slice(0, input.limit),
   };
 }
 
