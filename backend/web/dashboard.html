@@ -7482,8 +7482,8 @@
          in. Hash entry is wired in applyHashToState + onRouteChange below. -->
     <span class="sep" id="navKbSep" style="display:none">·</span>
     <a class="nav-link" id="navKb" onclick="goKb(); return false;" style="display:none"><svg class="workspace-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1v15"/></svg>Knowledge Base</a>
-    <!-- Scout AI is an owner/admin pilot. The page and its API enforce the same
-         boundary; this gate only keeps the pilot out of everybody else's nav. -->
+    <!-- Scout AI is available to managers and above. The page and its API enforce
+         the same boundary; this gate only keeps it out of closer navigation. -->
     <a class="nav-link" id="navScoutAi" onclick="window.location.href='/scout-ai'; return false;" style="display:none">Scout AI</a>
     <!-- ⚠⚠ COMING-SOON TABS ARE <span>, NOT <a> — AND THAT IS THE WHOLE
          IMPLEMENTATION OF "INERT". A <span> has no href, so it cannot navigate,
@@ -8198,6 +8198,8 @@
     // Admin console is owner-only; the Team (manager) view is for managers + owners.
     if (state.me.role === 'owner') {
       document.getElementById('adminLink').style.display = '';
+    }
+    if (['manager', 'owner'].includes(state.me.role)) {
       document.getElementById('navScoutAi').style.display = '';
     }
     if (state.me.role === 'manager' || state.me.role === 'owner') {

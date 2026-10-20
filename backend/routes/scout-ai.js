@@ -60,8 +60,8 @@ async function availableClosers(admin, actor) {
   }).filter(function (profile) { return profile.active && visible.has(profile.user_id); });
 }
 
-// This is a deliberately narrow first tool endpoint, not a general query API.
-// It remains owner-only until the chat writer and scope rules are complete.
+// This is a deliberately narrow internal fact endpoint, not a general query API.
+// The Scout AI conversation below has its own manager-and-above access boundary.
 router.post('/facts/objection-cohort', requireAuth, requireRole('owner'), async function (req, res) {
   try {
     const range = defaultRange(req.body);
@@ -80,7 +80,7 @@ router.post('/facts/objection-cohort', requireAuth, requireRole('owner'), async 
   }
 });
 
-router.post('/ask', requireAuth, requireRole('owner'), async function (req, res) {
+router.post('/ask', requireAuth, requireRole(['manager', 'owner']), async function (req, res) {
   try {
     const question = String((req.body && req.body.question) || '').trim();
     if (!question) return res.status(400).json({ error: 'Ask Scout a question first.' });

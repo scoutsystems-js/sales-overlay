@@ -21,17 +21,17 @@ test('Scout AI has a private question page, not a new dashboard metric', () => {
   assert.match(source, /conversation/);
   assert.match(source, /Scout is checking saved evidence/);
   assert.match(source, /loading-message/);
-  assert.match(source, /me\.role !== 'owner'/);
+  assert.match(source, /\['manager', 'owner'\]/);
   assert.doesNotMatch(source, /spouse-objection cohort close rate/i);
 });
 
-test('the admin dashboard gives the owner a visible path to the private Scout AI pilot', () => {
+test('the dashboard gives managers and above a visible path to Scout AI', () => {
   const file = path.join(__dirname, '..', 'web', 'dashboard.html');
   const source = fs.readFileSync(file, 'utf8');
 
   assert.match(source, /id="navScoutAi"[^>]*>Scout AI/);
   assert.match(source, /window\.location\.href\s*=\s*'\/scout-ai'/);
-  assert.match(source, /state\.me\.role\s*===\s*'owner'[\s\S]{0,300}navScoutAi/);
+  assert.match(source, /\['manager', 'owner'\]\.includes\(state\.me\.role\)[\s\S]{0,300}navScoutAi/);
 });
 
 test('the active composer follows the conversation instead of covering the answer', () => {

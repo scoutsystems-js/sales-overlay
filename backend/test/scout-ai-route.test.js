@@ -7,7 +7,7 @@ const path = require('node:path');
 const express = require('express');
 const http = require('http');
 
-test('Scout AI has an owner-only route module', () => {
+test('Scout AI has a manager-and-above conversation route module', () => {
   assert.ok(
     fs.existsSync(path.join(__dirname, '..', 'routes', 'scout-ai.js')),
     'the question route needs an explicit owner gate before it can be mounted'
@@ -71,9 +71,11 @@ test('the conversation route rejects an empty question before a model call', asy
   assert.match(owner.body.error, /Ask Scout a question/);
 });
 
-test('only the owner can reach the Scout AI conversation during the admin pilot', async () => {
+test('a manager and above can reach the Scout AI conversation, but a closer cannot', async () => {
   const closer = await post(appFor('user'), {}, '/scout-ai/ask');
   const manager = await post(appFor('manager'), {}, '/scout-ai/ask');
+  const owner = await post(appFor('owner'), {}, '/scout-ai/ask');
   assert.equal(closer.status, 403);
-  assert.equal(manager.status, 403);
+  assert.equal(manager.status, 400);
+  assert.equal(owner.status, 400);
 });
