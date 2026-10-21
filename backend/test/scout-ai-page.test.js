@@ -61,3 +61,11 @@ test('call-search answers render the existing call outcome and links, without in
   assert.match(source, /follow_up:'Open'/);
   assert.doesNotMatch(source, /Follow-up \/ open/);
 });
+
+test('open call cards can show only saved outcome evidence and its recorded moment', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'web', 'scout-ai.html'), 'utf8');
+  assert.match(source, /outcome_evidence/);
+  assert.match(source, /What kept it open/);
+  assert.match(source, /Watch outcome moment/);
+  assert.doesNotMatch(source, /No documented objection on record/);
+});

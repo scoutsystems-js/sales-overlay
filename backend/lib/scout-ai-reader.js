@@ -135,10 +135,23 @@ async function analysesForCalls(admin, callIds) {
   if (!callIds.length) return [];
   return chunked(callIds, function (ids) {
     return admin.from('call_analyses')
-      .select('fathom_call_id, outcome, prospect_name, status')
+      .select('fathom_call_id, outcome, outcome_source, prospect_name, why_outcome, why_quote, why_timestamp_seconds, status')
       .in('fathom_call_id', ids)
       .eq('status', 'done');
   });
+}
+
+function savedOutcomeEvidence(analysis, outcome) {
+  if (!analysis || analysis.outcome_source === 'manual' || outcome !== 'follow_up') return null;
+  var reason = typeof analysis.why_outcome === 'string' ? analysis.why_outcome.trim() : '';
+  if (!reason) return null;
+  var quote = typeof analysis.why_quote === 'string' ? analysis.why_quote.trim() : '';
+  return {
+    label: 'What kept it open',
+    reason: reason,
+    quote: quote || null,
+    timestamp_seconds: Number.isFinite(analysis.why_timestamp_seconds) ? analysis.why_timestamp_seconds : null,
+  };
 }
 
 async function stageAnalysesForCalls(admin, callIds) {
@@ -259,6 +272,7 @@ async function readCallExamples(admin, request) {
       call_date: call.call_date || null,
       recording_url: call.recording_url || null,
       outcome: outcome,
+      outcome_evidence: savedOutcomeEvidence(analysisByCall[call.id], outcome),
       objection: moment ? {
         quote: moment.quote || null,
         category: moment.objection_category || null,

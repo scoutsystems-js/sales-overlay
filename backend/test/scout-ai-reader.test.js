@@ -35,11 +35,12 @@ const ANALYSES = [
   { fathom_call_id: 'call-spouse', outcome: 'lost', status: 'done' },
   { fathom_call_id: 'call-spouse-followup', outcome: 'closed', status: 'done' },
   { fathom_call_id: 'call-partner', outcome: 'lost', status: 'done' },
-  { fathom_call_id: 'call-open', outcome: 'follow_up', status: 'done' },
+  { fathom_call_id: 'call-open', outcome: 'follow_up', status: 'done', why_outcome: 'The prospect wanted to review the payment option before deciding.', why_quote: 'Let me look over the payment option tonight.', why_timestamp_seconds: 245, overall_summary: 'The prospect was interested and asked for time to review the payment option.' },
   { fathom_call_id: 'call-no-show', outcome: 'no_show', status: 'done' },
 ];
 
-function fakeAdmin() {
+function fakeAdmin(options) {
+  const configuredAnalyses = (options && options.analyses) || ANALYSES;
   return {
     from(table) {
       const state = { table, filters: {}, in: {} };
@@ -51,7 +52,7 @@ function fakeAdmin() {
         in(column, values) { state.in[column] = values; return chain; },
         range() { return chain; },
         then(resolve, reject) {
-          let rows = table === 'fathom_calls' ? CALLS : table === 'call_highlights' ? HIGHLIGHTS : table === 'call_analyses' ? ANALYSES : [];
+          let rows = table === 'fathom_calls' ? CALLS : table === 'call_highlights' ? HIGHLIGHTS : table === 'call_analyses' ? configuredAnalyses : [];
           rows = rows.filter(row => {
             return Object.keys(state.filters).every(key => {
               if (key.startsWith('gte:')) return row[key.slice(4)] >= state.filters[key];
@@ -231,6 +232,7 @@ test('the bounded reader returns real not-handled Partner calls with their exist
     call_date: '2026-10-03T12:00:00Z',
     recording_url: 'https://recording.example/partner',
     outcome: 'lost',
+    outcome_evidence: null,
     objection: {
       quote: 'I need to speak with my business partner.',
       category: 'partner',
@@ -255,6 +257,29 @@ test('the bounded reader treats a request for calls that did not close as Lost c
   ]);
   assert.ok(result.calls.every(function (call) { return call.outcome === 'lost'; }));
   assert.ok(result.calls.every(function (call) { return call.call_id !== 'call-open' && call.call_id !== 'call-no-show'; }));
+});
+
+test('the bounded reader gives an open follow-up its saved reason and exact moment without inferring one', async () => {
+  const result = await readCallExamples(fakeAdmin(), {
+    userId: 'josh', from: '2026-10-01T00:00:00Z', to: '2026-10-05T23:59:59Z', filter: { outcome: 'follow_up' }, limit: 5,
+  });
+  assert.equal(result.calls.length, 1);
+  assert.deepEqual(result.calls[0].outcome_evidence, {
+    label: 'What kept it open',
+    reason: 'The prospect wanted to review the payment option before deciding.',
+    quote: 'Let me look over the payment option tonight.',
+    timestamp_seconds: 245,
+  });
+});
+
+test('the bounded reader never carries a model reason forward after a manual outcome change', async () => {
+  const manualAnalyses = ANALYSES.map(function (analysis) {
+    return analysis.fathom_call_id === 'call-open' ? Object.assign({}, analysis, { outcome_source: 'manual' }) : analysis;
+  });
+  const result = await readCallExamples(fakeAdmin({ analyses: manualAnalyses }), {
+    userId: 'josh', from: '2026-10-01T00:00:00Z', to: '2026-10-05T23:59:59Z', filter: { outcome: 'follow_up' }, limit: 5,
+  });
+  assert.equal(result.calls[0].outcome_evidence, null);
 });
 
 test('the bounded reader keeps an exact not-closed request as an outcome breakdown, not a blended list', async () => {
