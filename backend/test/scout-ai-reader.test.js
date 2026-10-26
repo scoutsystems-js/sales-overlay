@@ -275,6 +275,18 @@ test('the bounded reader returns real not-handled Partner calls with their exist
   });
 });
 
+test('the bounded reader can return a named team sample when no closer was requested', async () => {
+  const result = await readCallExamples(fakeAdmin(), {
+    userIds: ['josh'], namesByUserId: { josh: 'Josh P' },
+    from: '2026-10-01T00:00:00Z', to: '2026-10-05T00:00:00Z',
+    filter: { category: 'partner', handling: 'not_handled', outcome: 'lost' },
+    limit: 5,
+  });
+  assert.equal(result.calls.length, 1);
+  assert.equal(result.calls[0].closer_name, 'Josh P');
+  assert.equal(result.calls[0].user_id, 'josh');
+});
+
 test('the bounded reader treats a request for calls that did not close as Lost calls only', async () => {
   const result = await readCallExamples(fakeAdmin(), {
     userId: 'josh',

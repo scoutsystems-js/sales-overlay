@@ -329,6 +329,28 @@ test('the model can return real recent not-handled objection calls instead of re
   assert.equal(result.evidence.calls[0].objection.resolution, 'unhandled');
 });
 
+test('an unnamed request for call examples searches the authorized team instead of demanding a closer', async () => {
+  const reads = [];
+  const responses = [
+    { content: [{ type: 'tool_use', id: 'team-calls', name: 'read_call_examples', input: { user_id: 'josh-id', category: 'partner', handling: 'not_handled', outcome: 'lost', limit: 5 } }] },
+    { content: [{ type: 'text', text: 'Here are five recent team examples.' }] },
+  ];
+  await answerQuestion({
+    question: 'Show me five calls that did not close because the Partner objection was not handled.',
+    profiles: PROFILES,
+    defaultRange: DEFAULT_RANGE,
+    model: 'fixture-model',
+    create: async () => responses.shift(),
+    readObjectionCohort: async () => { throw new Error('wrong reader'); },
+    readCallExamples: async request => {
+      reads.push(request);
+      return { kind: 'call_examples', window: DEFAULT_RANGE, filter: request.filter, matching_call_count: 0, calls: [] };
+    },
+  });
+  assert.deepEqual(reads[0].userIds, ['josh-id']);
+  assert.equal(reads[0].userId, null);
+});
+
 test('the model translates calls that did not close into Lost calls, not a mixed outcome list', async () => {
   const reads = [];
   const responses = [

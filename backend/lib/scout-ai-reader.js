@@ -52,7 +52,10 @@ function validateStageRequest(input) {
 
 function validateCallExamplesRequest(input) {
   input = input || {};
-  if (!input.userId || typeof input.userId !== 'string') throw new Error('A closer is required.');
+  var userId = typeof input.userId === 'string' && input.userId ? input.userId : null;
+  var userIds = Array.isArray(input.userIds) ? input.userIds.filter(function (id) { return typeof id === 'string' && id; }) : [];
+  if (userId && userIds.indexOf(userId) === -1) userIds = [userId];
+  if (!userIds.length) throw new Error('At least one closer is required.');
   if (!validIso(input.from) || !validIso(input.to) || input.from > input.to) throw new Error('A valid date range is required.');
   var filter = input.filter || {};
   var phrase = typeof filter.phrase === 'string' ? filter.phrase.trim() : '';
@@ -64,7 +67,9 @@ function validateCallExamplesRequest(input) {
   var limit = Number(input.limit);
   if (!Number.isInteger(limit) || limit < 1 || limit > 5) throw new Error('Choose between one and five calls.');
   return {
-    userId: input.userId,
+    userId: userId,
+    userIds: userIds,
+    namesByUserId: input.namesByUserId || {},
     from: input.from,
     to: input.to,
     filter: { phrase: phrase || null, category: category || null, handling: handling, outcome: outcome },
@@ -112,13 +117,47 @@ function baseTeamCalls(admin, userIds) {
 
 async function callsInWindow(admin, input) {
   var rows = await paged(function (from, to) {
-    return baseCalls(admin, input.userId)
+    var query = input.userId ? baseCalls(admin, input.userId) : baseTeamCalls(admin, input.userIds);
+    return query
       .gte('call_date', input.from)
       .lte('call_date', input.to)
       .order('call_date', { ascending: false })
       .range(from, to);
   });
   return realCallsOnly(rows);
+}
+
+function shuffled(values) {
+  var copy = values.slice();
+  for (var index = copy.length - 1; index > 0; index--) {
+    var swap = Math.floor(Math.random() * (index + 1));
+    var current = copy[index];
+    copy[index] = copy[swap];
+    copy[swap] = current;
+  }
+  return copy;
+}
+
+function variedTeamExamples(matches, userIds, limit) {
+  if (!matches.length || !userIds.length) return [];
+  var byUserId = {};
+  matches.forEach(function (call) {
+    if (!byUserId[call.user_id]) byUserId[call.user_id] = [];
+    byUserId[call.user_id].push(call);
+  });
+  var orderedUsers = shuffled(userIds.filter(function (id) { return (byUserId[id] || []).length; }));
+  var selected = [];
+  var offset = 0;
+  while (selected.length < limit) {
+    var added = false;
+    orderedUsers.forEach(function (userId) {
+      var call = byUserId[userId][offset];
+      if (call && selected.length < limit) { selected.push(call); added = true; }
+    });
+    if (!added) break;
+    offset++;
+  }
+  return selected;
 }
 
 async function highlightsForCalls(admin, callIds) {
@@ -266,7 +305,7 @@ async function readCallExamples(admin, request) {
       return true;
     });
     if ((input.filter.phrase || input.filter.category) && !moment) return null;
-    return {
+    var example = {
       call_id: call.id,
       prospect_name: (analysisByCall[call.id] && analysisByCall[call.id].prospect_name) || call.title || null,
       call_date: call.call_date || null,
@@ -281,6 +320,11 @@ async function readCallExamples(admin, request) {
         closer_response: moment.closer_response_verified === true && typeof moment.closer_response === 'string' && moment.closer_response.trim() ? moment.closer_response.trim() : null,
       } : null,
     };
+    if (!input.userId) {
+      example.user_id = call.user_id;
+      example.closer_name = input.namesByUserId[call.user_id] || null;
+    }
+    return example;
   }).filter(Boolean).sort(function (left, right) {
     return String(right.call_date || '').localeCompare(String(left.call_date || '')) || left.call_id.localeCompare(right.call_id);
   });
@@ -296,7 +340,7 @@ async function readCallExamples(admin, request) {
     matching_call_count: matches.length,
     outcome_breakdown: outcomeBreakdown,
     needs_outcome_choice: input.filter.outcome === 'not_closed',
-    calls: input.filter.outcome === 'not_closed' ? [] : matches.slice(0, input.limit),
+    calls: input.filter.outcome === 'not_closed' ? [] : (input.userId ? matches.slice(0, input.limit) : variedTeamExamples(matches, input.userIds, input.limit)),
   };
 }
 

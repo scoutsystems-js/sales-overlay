@@ -15,13 +15,13 @@ const COHORT_TOOL = {
   input_schema: {
     type: 'object',
     properties: {
-      user_id: { type: 'string', description: 'One id from the available closer list.' },
+      user_id: { type: 'string', description: 'One id from the available closer list. Omit when the user did not name a closer; Scout will draw examples from the authorized team.' },
       phrase: { type: 'string', description: 'Exact objection phrase to match, such as spouse or think about it. Omit if asking about a whole category.' },
       category: { type: 'string', enum: CATEGORIES, description: 'Canonical Scout objection category. Omit if a phrase is requested.' },
       from: { type: 'string', description: 'ISO date-time. Omit to use the stated default window.' },
       to: { type: 'string', description: 'ISO date-time. Omit to use the stated default window.' },
     },
-    required: ['user_id'],
+    required: [],
   },
 };
 
@@ -409,10 +409,19 @@ function validStageExamplesToolInput(input, profiles, defaults) {
   };
 }
 
-function validCallExamplesToolInput(input, profiles, defaults) {
+function currentQuestionNamesCloser(question, profiles) {
+  var wording = String(question || '').toLowerCase();
+  return (profiles || []).some(function (profile) {
+    var name = String(profile.name || '').trim().toLowerCase();
+    var first = name.split(/\s+/)[0];
+    return (name && wording.indexOf(name) !== -1) || (first && new RegExp('\\b' + first.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i').test(wording));
+  });
+}
+
+function validCallExamplesToolInput(input, profiles, defaults, forceTeamSample) {
   input = input || {};
-  var userId = input.user_id;
-  if (!(profiles || []).some(function (profile) { return profile.user_id === userId; })) throw new Error('Scout AI could not match that closer.');
+  var userId = forceTeamSample ? null : (input.user_id || null);
+  if (userId && !(profiles || []).some(function (profile) { return profile.user_id === userId; })) throw new Error('Scout AI could not match that closer.');
   var phrase = typeof input.phrase === 'string' ? input.phrase.trim() : '';
   var category = typeof input.category === 'string' ? input.category.trim().toLowerCase() : '';
   var handling = input.handling === 'handled' || input.handling === 'not_handled' ? input.handling : null;
@@ -421,8 +430,13 @@ function validCallExamplesToolInput(input, profiles, defaults) {
   if (!phrase && CATEGORIES.indexOf(category) === -1 && !outcome) throw new Error('Scout AI needs an outcome, objection phrase, or category for those calls.');
   if (handling && !phrase && CATEGORIES.indexOf(category) === -1) throw new Error('Scout AI needs an objection phrase or category to filter handling.');
   if (!Number.isInteger(limit) || limit < 1 || limit > 5) throw new Error('Scout AI can return between one and five calls.');
+  var userIds = (profiles || []).map(function (profile) { return profile.user_id; });
+  var namesByUserId = {};
+  (profiles || []).forEach(function (profile) { namesByUserId[profile.user_id] = profile.name; });
   return {
     userId: userId,
+    userIds: userId ? [userId] : userIds,
+    namesByUserId: namesByUserId,
     filter: { phrase: phrase || null, category: CATEGORIES.indexOf(category) !== -1 ? category : null, handling: handling, outcome: outcome },
     limit: limit,
     range: rangeFor(input, defaults),
@@ -446,7 +460,7 @@ function systemPrompt(profiles, defaults) {
     'For “what does a closer do when an objection works versus when it does not,” use the objection-coaching-comparison tool once for that closer and category. State only the saved repeated patterns it returns; never add a cause, outcome, or pattern that is not present.',
     'For an overall close-rate question, use the closer close-rate tool. For “who needs help with Discovery/Pitch/Close/Intro/Objection Handling,” use the stage-performance tool with that stage and explain that only sufficiently measured scores are ranked. For “who needs the most coaching overall,” use the stage-performance tool exactly once with no stage and no closer, then state the returned priority directly; do not split it into separate stage reads or call a partial result an overall answer. Do not claim that one stage causes, feeds into, or is higher leverage than another unless a Scout fact tool explicitly returned that relationship.',
     'For a request to show saved calls or examples for any sales stage, use the stage-examples tool. Describe only the saved exchange or moment; never say it caused a grade, handling result, or call outcome.',
-    'For a request to show specific recent objection calls or calls by outcome, use the call-examples tool. Return the available real calls directly. Do not refuse by describing a tool limitation. “Did not close,” “failed to close,” and “lost” mean lost only. Open follow-ups and no-shows are different outcomes and must never be called lost. For the exact phrase “not closed,” report the returned Lost, Open, and No-show breakdown and ask which group they want to review. A saved objection exchange can support an objection request. For an Open call, use its saved outcome_evidence only when it is present, call it “what kept it open,” and say the deal remains open; never infer a reason from the outcome alone or claim the reason caused a loss.',
+    'For a request to show specific recent objection calls or calls by outcome, use the call-examples tool. Return the available real calls directly. When the user did not name a closer, omit user_id: Scout will choose a varied sample from the authorized team, rather than asking the user to choose a closer. Do not refuse by describing a tool limitation. “Did not close,” “failed to close,” and “lost” mean lost only. Open follow-ups and no-shows are different outcomes and must never be called lost. For the exact phrase “not closed,” report the returned Lost, Open, and No-show breakdown and ask which group they want to review. A saved objection exchange can support an objection request. For an Open call, use its saved outcome_evidence only when it is present, call it “what kept it open,” and say the deal remains open; never infer a reason from the outcome alone or claim the reason caused a loss.',
     'Default date range: ' + defaults.from + ' through ' + defaults.to + '.',
     'Available closers (use only these ids):\n' + people,
   ].join('\n\n');
@@ -625,7 +639,7 @@ async function answerQuestion(options) {
     }
     if (tool.name === CALL_EXAMPLES_TOOL.name) {
       if (typeof options.readCallExamples !== 'function') throw new Error('Scout AI is not configured.');
-      return { kind: 'call-examples', tool: tool, request: validCallExamplesToolInput(tool.input, profiles, defaults) };
+      return { kind: 'call-examples', tool: tool, request: validCallExamplesToolInput(tool.input, profiles, defaults, !currentQuestionNamesCloser(question, profiles)) };
     }
     throw new Error('Scout AI requested an unavailable tool.');
   });
@@ -698,13 +712,18 @@ async function answerQuestion(options) {
         });
       } else {
         var callExamplesRequest = plan.request;
-        fact = await options.readCallExamples({
+        var callRead = {
           userId: callExamplesRequest.userId,
           filter: callExamplesRequest.filter,
           limit: callExamplesRequest.limit,
           from: callExamplesRequest.range.from,
           to: callExamplesRequest.range.to,
-        });
+        };
+        if (!callExamplesRequest.userId) {
+          callRead.userIds = callExamplesRequest.userIds;
+          callRead.namesByUserId = callExamplesRequest.namesByUserId;
+        }
+        fact = await options.readCallExamples(callRead);
       }
       facts.push(fact);
       toolResults.push({ type: 'tool_result', tool_use_id: tool.id, content: JSON.stringify(fact) });
