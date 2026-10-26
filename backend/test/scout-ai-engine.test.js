@@ -176,10 +176,14 @@ test('the model uses one complete stage read for who needs the most coaching ove
   });
   assert.deepEqual(reads, [{ userIds: ['josh-id'], namesByUserId: { 'josh-id': 'Josh P' }, userId: null, stage: null, from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to }]);
   assert.equal(result.evidence.priority.ties[0].stage, 'discovery');
-  assert.equal(result.follow_up_context, null, 'only an unambiguous Objection Handling priority gets a saved yes-action');
+  assert.deepEqual(result.follow_up_context, {
+    type: 'stage_choices',
+    actions: [{ type: 'stage_drilldown', user_id: 'josh-id', stage: 'discovery', label: 'Discovery', from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to }],
+  });
+  assert.match(result.answer, /lowest measured coaching area is Josh P · Discovery/);
 });
 
-test('an unambiguous Objection Handling priority offers only its exact closer and window as a saved follow-up action', async () => {
+test('a tied coaching priority saves one factual next action for every tied stage', async () => {
   const responses = [
     { content: [{ type: 'tool_use', id: 'tool-priority', name: 'read_stage_performance', input: {} }] },
     { content: [{ type: 'text', text: 'Josh’s lowest earned score is Objection Handling.' }] },
@@ -189,10 +193,54 @@ test('an unambiguous Objection Handling priority offers only its exact closer an
     create: async () => responses.shift(), readObjectionCohort: async () => FACTS,
     readStagePerformance: async () => ({
       kind: 'stage_performance', stage: null, window: DEFAULT_RANGE,
-      priority: { ties: [{ user_id: 'josh-id', name: 'Josh P', stage: 'objection', label: 'Objection Handling', score: 62, graded_calls: 10 }] }, closers: [],
+      priority: { ties: [
+        { user_id: 'josh-id', name: 'Josh P', stage: 'objection', label: 'Objection Handling', score: 62, graded_calls: 10 },
+        { user_id: 'josh-id', name: 'Josh P', stage: 'close', label: 'Close', score: 62, graded_calls: 12 },
+      ] }, closers: [],
     }),
   });
-  assert.deepEqual(result.follow_up_context, { type: 'objection_drilldown', user_id: 'josh-id', from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to });
+  assert.deepEqual(result.follow_up_context, {
+    type: 'stage_choices',
+    actions: [
+      { type: 'stage_drilldown', user_id: 'josh-id', stage: 'objection', label: 'Objection Handling', from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to },
+      { type: 'stage_drilldown', user_id: 'josh-id', stage: 'close', label: 'Close', from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to },
+    ],
+  });
+  assert.match(result.answer, /scores do not establish that one area causes the other/);
+});
+
+test('an affirmative answer to tied priorities asks for a factual stage choice instead of repeating or guessing', async () => {
+  const result = await answerQuestion({
+    question: 'yes', profiles: PROFILES, defaultRange: DEFAULT_RANGE, model: 'fixture-model',
+    create: async () => { throw new Error('a tie must not return to the model'); },
+    readObjectionCohort: async () => FACTS,
+    followUp: {
+      type: 'stage_choices', actions: [
+        { type: 'stage_drilldown', user_id: 'josh-id', stage: 'objection', label: 'Objection Handling', from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to },
+        { type: 'stage_drilldown', user_id: 'josh-id', stage: 'close', label: 'Close', from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to },
+      ],
+    },
+  });
+  assert.match(result.answer, /Choose an area to review/);
+  assert.equal(result.follow_up_context.actions.length, 2);
+});
+
+test('an affirmative stage choice opens the exact saved stage evidence for any call area', async () => {
+  const stageReads = [];
+  const exampleReads = [];
+  const result = await answerQuestion({
+    question: 'yes', profiles: PROFILES, defaultRange: DEFAULT_RANGE, model: 'fixture-model',
+    create: async () => { throw new Error('a selected stage must not return to the model'); },
+    readObjectionCohort: async () => FACTS,
+    readStagePerformance: async request => { stageReads.push(request); return { kind: 'stage_performance', window: DEFAULT_RANGE, stage: 'close', closers: [{ user_id: 'josh-id', name: 'Josh P', score: 62, graded_calls: 12 }] }; },
+    readStageExamples: async request => { exampleReads.push(request); return { kind: 'stage_examples', window: DEFAULT_RANGE, stage: 'close', examples: [{ call_id: 'call-1', exchange: [{ label: 'Closer asks', quote: 'Are you ready to move forward?' }] }] }; },
+    followUp: { type: 'stage_drilldown', user_id: 'josh-id', stage: 'close', label: 'Close', from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to },
+  });
+  assert.deepEqual(stageReads, [{ userIds: ['josh-id'], namesByUserId: { 'josh-id': 'Josh P' }, userId: 'josh-id', stage: 'close', from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to }]);
+  assert.deepEqual(exampleReads, [{ userIds: ['josh-id'], namesByUserId: { 'josh-id': 'Josh P' }, userId: 'josh-id', stage: 'close', from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to }]);
+  assert.equal(result.evidence.kind, 'stage_drilldown');
+  assert.equal(result.evidence.stage, 'close');
+  assert.match(result.answer, /Close earned score is 62/);
 });
 
 test('the model can return a closer’s saved Discovery exchange without inventing coaching', async () => {

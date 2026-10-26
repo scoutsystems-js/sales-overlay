@@ -53,10 +53,12 @@ test('an Objection Handling priority card opens that closer\'s existing objectio
   assert.match(source, /metric-link/);
 });
 
-test('an affirmative objection drilldown renders facts and only saved comparison patterns', () => {
+test('coaching priority actions can select any saved call stage without guessing from a typed yes', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'web', 'scout-ai.html'), 'utf8');
-  assert.match(source, /objection_drilldown/);
-  assert.match(source, /Objection breakdown/);
+  assert.match(source, /stage_choices/);
+  assert.match(source, /stage_drilldown/);
+  assert.match(source, /renderFollowUpChoices/);
+  assert.match(source, /data-stage-action/);
   assert.match(source, /follow_up_context/);
 });
 

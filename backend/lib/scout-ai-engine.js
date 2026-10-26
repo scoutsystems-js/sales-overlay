@@ -6,7 +6,8 @@
 
 const CATEGORIES = ['fear', 'timing', 'partner', 'logistical', 'other'];
 const STAGES = ['intro', 'discovery', 'pitch', 'objection', 'close'];
-const EVIDENCE_STAGES = ['discovery', 'pitch', 'close'];
+const EVIDENCE_STAGES = STAGES;
+const STAGE_LABELS = { intro: 'Intro', discovery: 'Discovery', pitch: 'Pitch', objection: 'Objection Handling', close: 'Close' };
 
 const COHORT_TOOL = {
   name: 'read_objection_cohort',
@@ -95,12 +96,12 @@ const STAGE_PERFORMANCE_TOOL = {
 
 const STAGE_EXAMPLES_TOOL = {
   name: 'read_stage_examples',
-  description: 'Read up to three saved, verified call exchanges for Discovery, Pitch, or Close. Use when asked to show a closer’s calls or exact examples for one of those stages. The exchange is evidence only; do not claim it caused a score or outcome.',
+  description: 'Read up to three saved, verified call moments for Intro, Discovery, Pitch, Objection Handling, or Close. Use when asked to show a closer’s calls or exact examples for one stage. The saved moment is evidence only; do not claim it caused a score or outcome.',
   input_schema: {
     type: 'object',
     properties: {
       user_id: { type: 'string', description: 'One id from the available closer list. Omit to show examples from the authorized group.' },
-      stage: { type: 'string', enum: EVIDENCE_STAGES, description: 'Discovery, Pitch, or Close.' },
+      stage: { type: 'string', enum: EVIDENCE_STAGES, description: 'Intro, Discovery, Pitch, Objection Handling, or Close.' },
       from: { type: 'string', description: 'ISO date-time. Omit to use the stated default window.' },
       to: { type: 'string', description: 'ISO date-time. Omit to use the stated default window.' },
     },
@@ -171,19 +172,26 @@ function isAffirmative(question) {
   return /^(?:yes|yeah|yep|sure|please|go ahead|do it)$/i.test(String(question || '').trim().replace(/[.!]+$/, ''));
 }
 
-// The browser saves this only after Scout offers one unambiguous objection
-// drilldown. Validate it again on the server: a client cannot use it to read a
-// closer outside the actor's existing Scout AI scope.
+// Follow-up actions are facts generated from a returned coaching priority.
+// Validate them again here: a client cannot use them to read a closer outside
+// the actor's existing Scout AI scope.
 function validFollowUpContext(input, profiles, defaults) {
-  if (!input || input.type !== 'objection_drilldown') return null;
-  var profile = (profiles || []).find(function (item) { return item.user_id === input.user_id; });
-  if (!profile) return null;
-  try {
-    var range = rangeFor({ from: input.from, to: input.to }, defaults);
-    return { type: 'objection_drilldown', userId: profile.user_id, name: profile.name, range: range };
-  } catch (_) {
-    return null;
-  }
+  if (!input || typeof input !== 'object') return null;
+  var rawActions = input.type === 'stage_choices' ? input.actions : [input];
+  if (!Array.isArray(rawActions) || !rawActions.length || rawActions.length > STAGES.length) return null;
+  var actions = rawActions.map(function (action) {
+    if (!action || (action.type !== 'stage_drilldown' && action.type !== 'objection_drilldown')) return null;
+    var stage = action.type === 'objection_drilldown' ? 'objection' : action.stage;
+    if (STAGES.indexOf(stage) === -1) return null;
+    var profile = (profiles || []).find(function (item) { return item.user_id === action.user_id; });
+    if (!profile) return null;
+    try {
+      var range = rangeFor({ from: action.from, to: action.to }, defaults);
+      return { type: 'stage_drilldown', userId: profile.user_id, name: profile.name, stage: stage, label: STAGE_LABELS[stage], range: range };
+    } catch (_) { return null; }
+  });
+  if (actions.some(function (action) { return !action; })) return null;
+  return actions.length === 1 ? actions[0] : { type: 'stage_choices', actions: actions };
 }
 
 function categorySentence(item, label) {
@@ -209,11 +217,44 @@ function objectionDrilldownAnswer(overview, comparison) {
   return answer.trim();
 }
 
+function stageDrilldownAnswer(action, performance, examples) {
+  var closer = action.name || 'This closer';
+  var score = performance && performance.closers && performance.closers[0];
+  var answer = closer + '’s ' + action.label + ' earned score is ' + (score && score.score != null ? score.score : 'not available') + ' across ' + (score && score.graded_calls != null ? score.graded_calls : 0) + ' graded calls in this date range.';
+  var count = examples && Array.isArray(examples.examples) ? examples.examples.length : 0;
+  answer += count ? ' Scout found ' + count + ' saved ' + action.label + ' call moment' + (count === 1 ? '' : 's') + ' to review below.' : ' Scout does not have a saved ' + action.label + ' call moment to show for this date range yet.';
+  return answer;
+}
+
+function coachingPriorityAnswer(facts) {
+  var ties = facts && facts.priority && Array.isArray(facts.priority.ties) ? facts.priority.ties : [];
+  if (!ties.length) return 'Scout does not have enough measured stage data to name one coaching priority for this date range.';
+  var labels = ties.map(function (item) {
+    return item.name + ' · ' + item.label + ' (' + item.score + ' across ' + item.graded_calls + ' graded calls)';
+  });
+  if (labels.length === 1) return 'For this date range, Scout’s lowest measured coaching area is ' + labels[0] + '. Review the saved evidence below.';
+  return 'For this date range, Scout found a tie for the lowest measured coaching score: ' + labels.join(' and ') + '. The scores do not establish that one area causes the other. Choose an area below to review its saved evidence.';
+}
+
 function followUpContextFromFacts(facts) {
-  if (!facts || facts.kind !== 'stage_performance' || !facts.priority || !Array.isArray(facts.priority.ties) || facts.priority.ties.length !== 1) return null;
-  var priority = facts.priority.ties[0];
-  if (!priority || priority.stage !== 'objection' || !priority.user_id || !facts.window) return null;
-  return { type: 'objection_drilldown', user_id: priority.user_id, from: facts.window.from, to: facts.window.to };
+  if (!facts || facts.kind !== 'stage_performance' || !facts.priority || !Array.isArray(facts.priority.ties) || !facts.priority.ties.length || !facts.window) return null;
+  var actions = facts.priority.ties.map(function (priority) {
+    if (!priority || !priority.user_id || STAGES.indexOf(priority.stage) === -1) return null;
+    return { type: 'stage_drilldown', user_id: priority.user_id, stage: priority.stage, label: STAGE_LABELS[priority.stage], from: facts.window.from, to: facts.window.to };
+  }).filter(Boolean);
+  if (!actions.length || actions.length !== facts.priority.ties.length) return null;
+  return { type: 'stage_choices', actions: actions };
+}
+
+function serializedFollowUp(context) {
+  if (!context) return null;
+  var actions = context.type === 'stage_choices' ? context.actions : [context];
+  return {
+    type: 'stage_choices',
+    actions: actions.map(function (action) {
+      return { type: 'stage_drilldown', user_id: action.userId, stage: action.stage, label: action.label, from: action.range.from, to: action.range.to };
+    }),
+  };
 }
 
 function validToolInput(input, profiles, defaults) {
@@ -282,7 +323,7 @@ function validStagePerformanceToolInput(input, profiles, defaults) {
 function validStageExamplesToolInput(input, profiles, defaults) {
   input = input || {};
   var stage = typeof input.stage === 'string' ? input.stage.trim().toLowerCase() : '';
-  if (EVIDENCE_STAGES.indexOf(stage) === -1) throw new Error('Scout has saved call examples only for Discovery, Pitch, or Close.');
+  if (EVIDENCE_STAGES.indexOf(stage) === -1) throw new Error('Scout needs a valid sales stage for those saved call moments.');
   var userId = input.user_id || null;
   if (userId && !(profiles || []).some(function (profile) { return profile.user_id === userId; })) throw new Error('Scout AI could not match that closer.');
   var namesByUserId = {};
@@ -331,8 +372,8 @@ function systemPrompt(profiles, defaults) {
     'For a team-wide objection question, distinguish the objection raised most often from the objection handled least often. They can be different.',
     'For “who handles a category best,” use the team leaderboard tool once. Do not call one closer tool per person.',
     'For “what does a closer do when an objection works versus when it does not,” use the objection-coaching-comparison tool once for that closer and category. State only the saved repeated patterns it returns; never add a cause, outcome, or pattern that is not present.',
-    'For an overall close-rate question, use the closer close-rate tool. For “who needs help with Discovery/Pitch/Close/Intro/Objection Handling,” use the stage-performance tool with that stage and explain that only sufficiently measured scores are ranked. For “who needs the most coaching overall,” use the stage-performance tool exactly once with no stage and no closer, then state the returned priority directly; do not split it into separate stage reads or call a partial result an overall answer.',
-    'For a request to show saved calls or examples for Discovery, Pitch, or Close, use the stage-examples tool. Describe only the saved exchange; never say it caused a grade, handling result, or call outcome.',
+    'For an overall close-rate question, use the closer close-rate tool. For “who needs help with Discovery/Pitch/Close/Intro/Objection Handling,” use the stage-performance tool with that stage and explain that only sufficiently measured scores are ranked. For “who needs the most coaching overall,” use the stage-performance tool exactly once with no stage and no closer, then state the returned priority directly; do not split it into separate stage reads or call a partial result an overall answer. Do not claim that one stage causes, feeds into, or is higher leverage than another unless a Scout fact tool explicitly returned that relationship.',
+    'For a request to show saved calls or examples for any sales stage, use the stage-examples tool. Describe only the saved exchange or moment; never say it caused a grade, handling result, or call outcome.',
     'For a request to show specific recent objection calls or calls by outcome, use the call-examples tool. Return the available real calls directly. Do not refuse by describing a tool limitation. “Did not close,” “failed to close,” and “lost” mean lost only. Open follow-ups and no-shows are different outcomes and must never be called lost. For the exact phrase “not closed,” report the returned Lost, Open, and No-show breakdown and ask which group they want to review. A saved objection exchange can support an objection request. For an Open call, use its saved outcome_evidence only when it is present, call it “what kept it open,” and say the deal remains open; never infer a reason from the outcome alone or claim the reason caused a loss.',
     'Default date range: ' + defaults.from + ' through ' + defaults.to + '.',
     'Available closers (use only these ids):\n' + people,
@@ -403,6 +444,31 @@ async function answerQuestion(options) {
   if (!defaults || !defaults.from || !defaults.to) throw new Error('Scout AI needs a default date range.');
   var followUp = validFollowUpContext(options.followUp, profiles, defaults);
   if (isAffirmative(question) && followUp) {
+    if (followUp.type === 'stage_choices') {
+      return {
+        status: 'answered',
+        answer: 'Choose an area to review: ' + followUp.actions.map(function (action) { return action.name + ' · ' + action.label; }).join(' or ') + '. Scout will show only the saved evidence for the one you select.',
+        evidence: null,
+        follow_up_context: serializedFollowUp(followUp),
+      };
+    }
+    if (followUp.stage !== 'objection') {
+      if (typeof options.readStagePerformance !== 'function' || typeof options.readStageExamples !== 'function') throw new Error('Scout AI is not configured.');
+      var namesByUserId = {}; namesByUserId[followUp.userId] = followUp.name;
+      var performance = await options.readStagePerformance({
+        userIds: [followUp.userId], namesByUserId: namesByUserId, userId: followUp.userId,
+        stage: followUp.stage, from: followUp.range.from, to: followUp.range.to,
+      });
+      var examples = await options.readStageExamples({
+        userIds: [followUp.userId], namesByUserId: namesByUserId, userId: followUp.userId,
+        stage: followUp.stage, from: followUp.range.from, to: followUp.range.to,
+      });
+      return {
+        status: 'answered', answer: stageDrilldownAnswer(followUp, performance, examples),
+        evidence: { kind: 'stage_drilldown', window: examples.window, closer: { user_id: followUp.userId, name: followUp.name }, stage: followUp.stage, score: performance.closers && performance.closers[0] ? performance.closers[0].score : null, graded_calls: performance.closers && performance.closers[0] ? performance.closers[0].graded_calls : 0, examples: examples.examples || [] },
+        follow_up_context: null,
+      };
+    }
     if (typeof options.readCloserObjectionOverview !== 'function') throw new Error('Scout AI is not configured.');
     var overview = await options.readCloserObjectionOverview({
       userId: followUp.userId, name: followUp.name, from: followUp.range.from, to: followUp.range.to,
@@ -569,6 +635,12 @@ async function answerQuestion(options) {
     } catch (error) {
       toolResults.push({ type: 'tool_result', tool_use_id: tool.id, is_error: true, content: (error && error.message) || 'Scout could not read that evidence.' });
     }
+  }
+  if (facts.length === 1 && facts[0] && facts[0].kind === 'stage_performance' && facts[0].priority) {
+    return {
+      status: 'answered', answer: coachingPriorityAnswer(facts[0]), evidence: evidenceFrom(facts[0]),
+      follow_up_context: followUpContextFromFacts(facts[0]),
+    };
   }
   messages.push({ role: 'assistant', content: first.content });
   messages.push({ role: 'user', content: toolResults });

@@ -15,7 +15,7 @@ var { comparisonFromSavedCoaching } = require('./scout-ai-coaching-comparison');
 
 var PAGE_SIZE = 1000;
 var MAX_PAGES = 25;
-var EVIDENCE_STAGES = ['discovery', 'pitch', 'close'];
+var EVIDENCE_STAGES = SECTION_ORDER;
 var EVIDENCE_LABELS = {
   discovery: ['Prospect context', 'Closer digs deeper', 'Prospect detail'],
   pitch: ['Prospect question', 'Closer explains', 'Prospect confirmation'],
@@ -168,7 +168,7 @@ async function stageHighlightsForCalls(admin, callIds) {
   if (!callIds.length) return [];
   return chunked(callIds, function (ids) {
     return admin.from('call_highlights')
-      .select('fathom_call_id, section, timestamp_seconds, coaching_evidence')
+      .select('fathom_call_id, section, timestamp_seconds, coaching_evidence, quote, speaker')
       .in('fathom_call_id', ids);
   });
 }
@@ -496,7 +496,7 @@ function savedStageExchange(value, stage) {
 
 async function readStageExamples(admin, request) {
   var input = validateStageRequest(request);
-  if (EVIDENCE_STAGES.indexOf(input.stage) === -1) throw new Error('Saved call examples are currently available for Discovery, Pitch, or Close.');
+  if (EVIDENCE_STAGES.indexOf(input.stage) === -1) throw new Error('A valid sales stage is required.');
   var calls = await paged(function (from, to) {
     return baseTeamCalls(admin, input.userIds)
       .gte('call_date', input.from)
@@ -512,6 +512,9 @@ async function readStageExamples(admin, request) {
     var call = callById[highlight.fathom_call_id];
     if (!call || highlight.section !== input.stage) return null;
     var exchange = savedStageExchange(highlight.coaching_evidence, input.stage);
+    if (!exchange && typeof highlight.quote === 'string' && highlight.quote.trim()) {
+      exchange = [{ label: 'Saved ' + (LABELS[input.stage] || input.stage) + ' moment', speaker: highlight.speaker || null, quote: highlight.quote.trim() }];
+    }
     if (!exchange) return null;
     return {
       call_id: call.id,

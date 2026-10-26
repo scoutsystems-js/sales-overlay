@@ -30,6 +30,7 @@ const HIGHLIGHTS = [
   { id: 'm-partner', fathom_call_id: 'call-partner', type: 'objection', quote: 'I need to speak with my business partner.', speaker: 'prospect', timestamp_seconds: 110, objection_surface: 'I need my partner', objection_category: 'partner', objection_class: 'true_objection', resolution: 'unhandled' },
   { id: 'm-discovery', fathom_call_id: 'call-spouse', type: 'strong_moment', section: 'discovery', quote: 'We are trying to find a better option.', speaker: 'prospect', timestamp_seconds: 60, coaching_evidence: { stage: 'discovery', prospect_context: { quote: 'We are trying to find a better option.' }, closer_probe: { quote: 'What has made the current option difficult?' }, prospect_detail: { quote: 'The lack of support has been the hardest part.' } } },
   { id: 'm-pitch', fathom_call_id: 'call-spouse', type: 'strong_moment', section: 'pitch', quote: 'How would this work?', speaker: 'prospect', timestamp_seconds: 130, coaching_evidence: { stage: 'pitch', prospect_question: { quote: 'How would this work?' }, closer_explanation: { quote: 'Here is how the support plan works.' }, prospect_confirmation: { quote: 'That makes sense.' } } },
+  { id: 'm-intro', fathom_call_id: 'call-partner', type: 'strong_moment', section: 'intro', quote: 'Thanks for making the time today.', speaker: 'closer', timestamp_seconds: 10 },
 ];
 const ANALYSES = [
   { fathom_call_id: 'call-spouse', outcome: 'lost', status: 'done' },
@@ -227,6 +228,15 @@ test('the bounded reader returns only a saved, verified exchange for the request
   ]);
   assert.equal(result.examples[0].prospect_name, 'Avery');
   assert.equal(result.examples[0].recording_url, 'https://recording.example/spouse');
+});
+
+test('the bounded reader can return a saved stage moment for Intro without inventing an exchange', async () => {
+  const result = await readStageExamples(fakeAdmin(), {
+    userIds: ['josh'], namesByUserId: { josh: 'Josh P' }, stage: 'intro',
+    from: '2026-10-01T00:00:00Z', to: '2026-10-05T00:00:00Z',
+  });
+  assert.equal(result.stage, 'intro');
+  assert.deepEqual(result.examples[0].exchange, [{ label: 'Saved Intro moment', speaker: 'closer', quote: 'Thanks for making the time today.' }]);
 });
 
 test('the bounded reader returns real not-handled Partner calls with their existing outcomes', async () => {
