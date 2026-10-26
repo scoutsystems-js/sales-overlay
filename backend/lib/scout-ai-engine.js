@@ -167,6 +167,55 @@ function rangeFor(input, defaults) {
   return { from: from, to: to };
 }
 
+function isAffirmative(question) {
+  return /^(?:yes|yeah|yep|sure|please|go ahead|do it)$/i.test(String(question || '').trim().replace(/[.!]+$/, ''));
+}
+
+// The browser saves this only after Scout offers one unambiguous objection
+// drilldown. Validate it again on the server: a client cannot use it to read a
+// closer outside the actor's existing Scout AI scope.
+function validFollowUpContext(input, profiles, defaults) {
+  if (!input || input.type !== 'objection_drilldown') return null;
+  var profile = (profiles || []).find(function (item) { return item.user_id === input.user_id; });
+  if (!profile) return null;
+  try {
+    var range = rangeFor({ from: input.from, to: input.to }, defaults);
+    return { type: 'objection_drilldown', userId: profile.user_id, name: profile.name, range: range };
+  } catch (_) {
+    return null;
+  }
+}
+
+function categorySentence(item, label) {
+  if (!item || item.rate == null) return '';
+  var category = String(item.category || 'This category');
+  category = category.charAt(0).toUpperCase() + category.slice(1);
+  return category + ' was ' + label + ': ' + item.handled + ' of ' + item.total + ' handled (' + item.rate + '%).';
+}
+
+function objectionDrilldownAnswer(overview, comparison) {
+  var closer = (overview.closer && overview.closer.name) || 'This closer';
+  var answer = closer + '’s saved objection breakdown is based on ' + overview.total + ' documented objections in this date range. ';
+  answer += categorySentence(overview.most_raised, 'raised most often') + ' ';
+  answer += categorySentence(overview.least_handled, 'handled least often');
+  if (comparison && (comparison.when_handled || comparison.when_not_handled)) {
+    var category = String(comparison.category || overview.least_handled.category || 'this objection');
+    category = category.charAt(0).toUpperCase() + category.slice(1);
+    if (comparison.when_handled) answer += ' When ' + category + ' was handled, Scout’s saved coaching pattern was: ' + comparison.when_handled;
+    if (comparison.when_not_handled) answer += ' When it was not handled, Scout’s saved coaching pattern was: ' + comparison.when_not_handled;
+  } else if (overview.least_handled && overview.least_handled.total) {
+    answer += ' Scout does not yet have enough saved repeated coaching evidence to describe the pattern behind ' + overview.least_handled.category + ' outcomes.';
+  }
+  return answer.trim();
+}
+
+function followUpContextFromFacts(facts) {
+  if (!facts || facts.kind !== 'stage_performance' || !facts.priority || !Array.isArray(facts.priority.ties) || facts.priority.ties.length !== 1) return null;
+  var priority = facts.priority.ties[0];
+  if (!priority || priority.stage !== 'objection' || !priority.user_id || !facts.window) return null;
+  return { type: 'objection_drilldown', user_id: priority.user_id, from: facts.window.from, to: facts.window.to };
+}
+
 function validToolInput(input, profiles, defaults) {
   input = input || {};
   var validIds = new Set((profiles || []).map(function (profile) { return profile.user_id; }));
@@ -352,6 +401,34 @@ async function answerQuestion(options) {
   var profiles = options.profiles || [];
   var defaults = options.defaultRange;
   if (!defaults || !defaults.from || !defaults.to) throw new Error('Scout AI needs a default date range.');
+  var followUp = validFollowUpContext(options.followUp, profiles, defaults);
+  if (isAffirmative(question) && followUp) {
+    if (typeof options.readCloserObjectionOverview !== 'function') throw new Error('Scout AI is not configured.');
+    var overview = await options.readCloserObjectionOverview({
+      userId: followUp.userId, name: followUp.name, from: followUp.range.from, to: followUp.range.to,
+    });
+    var category = overview && overview.least_handled && overview.least_handled.total ? overview.least_handled.category : null;
+    var comparison = null;
+    if (category && typeof options.readObjectionCoachingComparison === 'function') {
+      comparison = await options.readObjectionCoachingComparison({
+        userId: followUp.userId, name: followUp.name, category: category, from: followUp.range.from, to: followUp.range.to,
+      });
+    }
+    return {
+      status: 'answered',
+      answer: objectionDrilldownAnswer(overview, comparison),
+      evidence: {
+        kind: 'objection_drilldown', window: overview.window, closer: overview.closer,
+        total: overview.total, categories: overview.categories, most_raised: overview.most_raised,
+        least_handled: overview.least_handled, comparison: comparison ? {
+          category: comparison.category, handle_rate: comparison.handle_rate,
+          when_handled: comparison.when_handled, when_not_handled: comparison.when_not_handled,
+          handled_examples: comparison.handled_examples, not_handled_examples: comparison.not_handled_examples,
+        } : null,
+      },
+      follow_up_context: null,
+    };
+  }
   var hasPriorQuestions = Array.isArray(options.priorQuestions) && options.priorQuestions.some(function (item) {
     return typeof item === 'string' && item.trim();
   });
@@ -502,7 +579,10 @@ async function answerQuestion(options) {
     tools: SCOUT_TOOLS,
     messages: messages,
   });
-  return { status: 'answered', answer: textFrom(final), evidence: facts.length ? evidenceFrom(facts[0]) : null };
+  return {
+    status: 'answered', answer: textFrom(final), evidence: facts.length ? evidenceFrom(facts[0]) : null,
+    follow_up_context: facts.length ? followUpContextFromFacts(facts[0]) : null,
+  };
 }
 
 module.exports = {

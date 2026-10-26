@@ -14,7 +14,7 @@ test('Scout AI has a bounded database reader before a question route can exist',
   );
 });
 
-const { readObjectionCohort, readTeamObjections, readTeamObjectionLeaderboard, readCloserCloseRate, readStagePerformance, readStageExamples, readCallExamples } = require('../lib/scout-ai-reader');
+const { readObjectionCohort, readTeamObjections, readCloserObjectionOverview, readTeamObjectionLeaderboard, readCloserCloseRate, readStagePerformance, readStageExamples, readCallExamples } = require('../lib/scout-ai-reader');
 const { comparisonFromSavedCoaching } = require('../lib/scout-ai-coaching-comparison');
 
 const CALLS = [
@@ -110,6 +110,19 @@ test('the bounded reader returns a team objection overview from saved strict mom
     to: '2026-10-05T00:00:00Z',
   });
   assert.equal(result.kind, 'team_objection_overview');
+  assert.equal(result.most_raised.category, 'partner');
+  assert.equal(result.most_raised.total, 2);
+  assert.equal(result.least_handled.rate, 50);
+});
+
+test('the bounded reader exposes one closer’s existing objection overview without a new calculation', async () => {
+  const result = await readCloserObjectionOverview(fakeAdmin(), {
+    userId: 'josh', name: 'Josh P',
+    from: '2026-10-01T00:00:00Z',
+    to: '2026-10-05T23:59:59Z',
+  });
+  assert.equal(result.kind, 'closer_objection_overview');
+  assert.deepEqual(result.closer, { user_id: 'josh', name: 'Josh P' });
   assert.equal(result.most_raised.category, 'partner');
   assert.equal(result.most_raised.total, 2);
   assert.equal(result.least_handled.rate, 50);

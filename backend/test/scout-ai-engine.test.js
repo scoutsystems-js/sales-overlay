@@ -176,6 +176,23 @@ test('the model uses one complete stage read for who needs the most coaching ove
   });
   assert.deepEqual(reads, [{ userIds: ['josh-id'], namesByUserId: { 'josh-id': 'Josh P' }, userId: null, stage: null, from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to }]);
   assert.equal(result.evidence.priority.ties[0].stage, 'discovery');
+  assert.equal(result.follow_up_context, null, 'only an unambiguous Objection Handling priority gets a saved yes-action');
+});
+
+test('an unambiguous Objection Handling priority offers only its exact closer and window as a saved follow-up action', async () => {
+  const responses = [
+    { content: [{ type: 'tool_use', id: 'tool-priority', name: 'read_stage_performance', input: {} }] },
+    { content: [{ type: 'text', text: 'Josh’s lowest earned score is Objection Handling.' }] },
+  ];
+  const result = await answerQuestion({
+    question: 'What closer needs the most coaching and in which area?', profiles: PROFILES, defaultRange: DEFAULT_RANGE, model: 'fixture-model',
+    create: async () => responses.shift(), readObjectionCohort: async () => FACTS,
+    readStagePerformance: async () => ({
+      kind: 'stage_performance', stage: null, window: DEFAULT_RANGE,
+      priority: { ties: [{ user_id: 'josh-id', name: 'Josh P', stage: 'objection', label: 'Objection Handling', score: 62, graded_calls: 10 }] }, closers: [],
+    }),
+  });
+  assert.deepEqual(result.follow_up_context, { type: 'objection_drilldown', user_id: 'josh-id', from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to });
 });
 
 test('the model can return a closer’s saved Discovery exchange without inventing coaching', async () => {
@@ -270,4 +287,44 @@ test('a follow-up gets prior user questions as context but still requires a fres
   assert.match(requests[0].messages[0].content, /Current user question: Show three of those calls\./);
   assert.deepEqual(requests[0].tool_choice, { type: 'any' });
   assert.equal(requests[1].messages[2].content[0].type, 'tool_result');
+});
+
+test('an affirmative answer to an objection drilldown follows the saved action instead of repeating the stage summary', async () => {
+  const reads = [];
+  const result = await answerQuestion({
+    question: 'yes',
+    followUp: { type: 'objection_drilldown', user_id: 'josh-id', from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to },
+    profiles: PROFILES,
+    defaultRange: DEFAULT_RANGE,
+    model: 'fixture-model',
+    create: async () => { throw new Error('the saved action must not ask the model to guess what yes means'); },
+    readObjectionCohort: async () => FACTS,
+    readCloserObjectionOverview: async request => {
+      reads.push(['overview', request]);
+      return {
+        kind: 'closer_objection_overview', window: DEFAULT_RANGE,
+        closer: { user_id: 'josh-id', name: 'Josh P' },
+        most_raised: { category: 'fear', total: 8, handled: 3, rate: 38 },
+        least_handled: { category: 'partner', total: 5, handled: 1, rate: 20 },
+        categories: { fear: { category: 'fear', total: 8, handled: 3, rate: 38 }, partner: { category: 'partner', total: 5, handled: 1, rate: 20 } },
+      };
+    },
+    readObjectionCoachingComparison: async request => {
+      reads.push(['comparison', request]);
+      return {
+        kind: 'objection_coaching_comparison', window: DEFAULT_RANGE, closer: { user_id: 'josh-id', name: 'Josh P' }, category: 'partner',
+        handle_rate: { handled: 1, total: 5, rate: 20 },
+        when_handled: 'He confirmed the prospect was personally ready before discussing the partner.',
+        when_not_handled: 'He accepted the partner as the stopping point without learning what the partner needed.',
+        handled_examples: [], not_handled_examples: [],
+      };
+    },
+  });
+  assert.deepEqual(reads, [
+    ['overview', { userId: 'josh-id', name: 'Josh P', from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to }],
+    ['comparison', { userId: 'josh-id', name: 'Josh P', category: 'partner', from: DEFAULT_RANGE.from, to: DEFAULT_RANGE.to }],
+  ]);
+  assert.equal(result.evidence.kind, 'objection_drilldown');
+  assert.match(result.answer, /Partner/);
+  assert.doesNotMatch(result.answer, /Would you like/i);
 });

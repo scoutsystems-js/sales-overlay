@@ -45,6 +45,21 @@ test('an overall coaching priority has its own evidence card', () => {
   assert.match(source, /Coaching priority/);
 });
 
+test('an Objection Handling priority card opens that closer\'s existing objections page in the same window', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'web', 'scout-ai.html'), 'utf8');
+  assert.match(source, /function objectionPageUrl/);
+  assert.match(source, /dashboard\?user=/);
+  assert.match(source, /#objections/);
+  assert.match(source, /metric-link/);
+});
+
+test('an affirmative objection drilldown renders facts and only saved comparison patterns', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'web', 'scout-ai.html'), 'utf8');
+  assert.match(source, /objection_drilldown/);
+  assert.match(source, /Objection breakdown/);
+  assert.match(source, /follow_up_context/);
+});
+
 test('a saved objection comparison shows both grounded patterns and the supporting calls', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'web', 'scout-ai.html'), 'utf8');
   assert.match(source, /evidence\.kind === 'objection_coaching_comparison'/);

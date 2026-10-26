@@ -3,7 +3,7 @@
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth, requireRole } = require('../middleware/auth');
-const { validateRequest, readObjectionCohort, readObjectionCoachingComparison, readTeamObjections, readTeamObjectionLeaderboard, readCloserCloseRate, readStagePerformance, readStageExamples, readCallExamples } = require('../lib/scout-ai-reader');
+const { validateRequest, readObjectionCohort, readObjectionCoachingComparison, readTeamObjections, readCloserObjectionOverview, readTeamObjectionLeaderboard, readCloserCloseRate, readStagePerformance, readStageExamples, readCallExamples } = require('../lib/scout-ai-reader');
 const { answerQuestion } = require('../lib/scout-ai-engine');
 const { visibleUserIds } = require('../lib/scout-ai-scope');
 const { resolveDisplayName } = require('../lib/display-name');
@@ -37,6 +37,13 @@ function priorQuestions(body) {
     throw new Error('Scout AI could not read this conversation.');
   }
   return values.map(function (item) { return item.trim(); }).filter(Boolean);
+}
+
+function followUpContext(body) {
+  var value = body && body.follow_up_context;
+  if (value == null) return null;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Scout AI could not read this follow-up.');
+  return value;
 }
 
 async function availableClosers(admin, actor) {
@@ -91,11 +98,13 @@ router.post('/ask', requireAuth, requireRole(['manager', 'owner']), async functi
       profiles: await availableClosers(admin, { id: req.user.id, role: req.user.role }),
       defaultRange: range,
       priorQuestions: priorQuestions(req.body),
+      followUp: followUpContext(req.body),
       model: CLAUDE_MODEL,
       create: function (params) { return createWithUsage(params, { userId: req.user.id }); },
       readObjectionCohort: function (input) { return readObjectionCohort(admin, input); },
       readObjectionCoachingComparison: function (input) { return readObjectionCoachingComparison(admin, input); },
       readTeamObjections: function (input) { return readTeamObjections(admin, input); },
+      readCloserObjectionOverview: function (input) { return readCloserObjectionOverview(admin, input); },
       readTeamObjectionLeaderboard: function (input) { return readTeamObjectionLeaderboard(admin, input); },
       readCloserCloseRate: function (input) { return readCloserCloseRate(admin, input); },
       readStagePerformance: function (input) { return readStagePerformance(admin, input); },
@@ -114,5 +123,6 @@ router._setAdminClientForTests = function (client) { adminOverride = client; };
 router._defaultRangeForTests = defaultRange;
 router._availableClosersForTests = availableClosers;
 router._priorQuestionsForTests = priorQuestions;
+router._followUpContextForTests = followUpContext;
 
 module.exports = router;

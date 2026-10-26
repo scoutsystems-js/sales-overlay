@@ -340,6 +340,25 @@ async function readTeamObjections(admin, request) {
   return overview;
 }
 
+// A single closer's category breakdown is the same strict, saved-fact
+// calculation used by the team Objections view. This wrapper only narrows the
+// authorized member list and gives the conversation a clearer shape.
+async function readCloserObjectionOverview(admin, request) {
+  var input = validateTeamRequest({
+    userIds: [request && request.userId],
+    from: request && request.from,
+    to: request && request.to,
+  });
+  var overview = await readTeamObjections(admin, input);
+  return Object.assign({}, overview, {
+    kind: 'closer_objection_overview',
+    closer: {
+      user_id: input.userIds[0],
+      name: (request && request.name) || 'Closer name not recorded',
+    },
+  });
+}
+
 async function readTeamObjectionLeaderboard(admin, request) {
   var input = validateTeamRequest(request);
   if (typeof input.category !== 'string' || !input.category.trim()) throw new Error('An objection category is required.');
@@ -523,6 +542,7 @@ module.exports = {
   readCallExamples: readCallExamples,
   readObjectionCoachingComparison: readObjectionCoachingComparison,
   readTeamObjections: readTeamObjections,
+  readCloserObjectionOverview: readCloserObjectionOverview,
   readTeamObjectionLeaderboard: readTeamObjectionLeaderboard,
   readCloserCloseRate: readCloserCloseRate,
   readStagePerformance: readStagePerformance,
