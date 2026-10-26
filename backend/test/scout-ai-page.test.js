@@ -53,6 +53,14 @@ test('an Objection Handling priority card opens that closer\'s existing objectio
   assert.match(source, /metric-link/);
 });
 
+test('leaderboard handler cards open each closer\'s objections drilldown in a new tab', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'web', 'scout-ai.html'), 'utf8');
+  assert.match(source, /function leaderboardMetric\(leader, category, window\)/);
+  assert.match(source, /leaderboardMetric\(leader, evidence\.category, evidence\.window\)/);
+  assert.match(source, /objectionPageUrl\(leader, window\)/);
+  assert.match(source, /target="_blank" rel="noopener"/);
+});
+
 test('a performance diagnosis gives the manager grounded coaching calls and a separate objections drilldown', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'web', 'scout-ai.html'), 'utf8');
   assert.match(source, /performance_coaching_diagnosis/);
