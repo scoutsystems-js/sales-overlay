@@ -59,6 +59,9 @@ test('leaderboard handler cards open each closer\'s objections drilldown in a ne
   assert.match(source, /leaderboardMetric\(leader, evidence\.category, evidence\.window\)/);
   assert.match(source, /objectionPageUrl\(leader, window\)/);
   assert.match(source, /target="_blank" rel="noopener"/);
+  assert.doesNotMatch(source, /item\.stage !== 'objection'/);
+  assert.match(source, /function dashboardCallUrl\(example\)/);
+  assert.match(source, /dashboardCallUrl\(example\)/);
 });
 
 test('a performance diagnosis gives the manager grounded coaching calls and a separate objections drilldown', () => {

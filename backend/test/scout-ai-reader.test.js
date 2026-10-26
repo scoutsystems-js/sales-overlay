@@ -141,6 +141,7 @@ test('the bounded reader returns a per-closer category leaderboard from saved fa
   assert.deepEqual(result.leaders[0], { user_id: 'josh', name: 'Josh P', handled: 1, total: 2, rate: 50 });
   assert.equal(result.handled_examples.length, 1);
   assert.equal(result.handled_examples[0].prospect_name, 'Avery');
+  assert.equal(result.handled_examples[0].user_id, 'josh');
 });
 
 test('the bounded reader uses Scout’s canonical prospect close rate for a closer', async () => {

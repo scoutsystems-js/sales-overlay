@@ -108,6 +108,7 @@ function selectObjectionExamples(rows, callsById, filter, state, limit) {
     var call = (callsById && callsById[row.fathom_call_id]) || {};
     return {
       call_id: row.fathom_call_id,
+      user_id: call.user_id || row.user_id || null,
       prospect_name: call.prospect_name || null,
       call_date: call.call_date || null,
       recording_url: call.recording_url || null,
