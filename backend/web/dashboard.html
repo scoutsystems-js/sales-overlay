@@ -5308,7 +5308,9 @@
     .sidebar { padding:20px 10px 16px; box-shadow:none; border:1px solid var(--border); }
     .sidebar .nav-link { font-size:var(--fs-secondary); padding:10px; }
     .sidebar .nav-soon { display:none !important; }
-    .workspace-team-pages { display:grid; gap:2px; padding:4px 0 8px 22px; }
+    /* Team pages stay available from Scout, Home, Daily Digest, and direct links.
+       They are intentionally not part of the permanent primary navigation. */
+    #workspaceTeamPages { display:none !important; }
     .workspace-team-link { color:var(--text); text-decoration:none; font-size:var(--fs-secondary); padding:7px 10px; border-left:1px solid var(--border); }
     .workspace-team-link.is-current { color:var(--accent); border-left-color:var(--accent); background:rgba(var(--accent-rgb),.06); }
     .workspace-team-link:hover { background:rgba(var(--accent-rgb),.08); }
@@ -5426,7 +5428,6 @@
     .coaching-rep-workspace button:focus-visible, .workspace-team-link:focus-visible, .coaching-priority summary:focus-visible, .strength-preview summary:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
     @media(max-width:900px) {
       .sidebar-workspace-label { display:none; }
-      .workspace-team-pages { display:flex; flex-wrap:wrap; padding:0; }
       .sidebar .nav-team-wrap { flex-wrap:wrap; }
       .workspace-team-link { border-left:0; padding:7px; }
       .coaching-rep-workspace { grid-template-columns:200px minmax(0,1fr); }
@@ -7447,10 +7448,12 @@
      removing them would throw at boot. Hiding them in CSS means that write still
      lands and still resolves to hidden. -->
 <aside class="sidebar" id="sidebar" aria-label="Pages"><div class="sidebar-workspace-label">Your workspace</div>
+    <!-- Scout AI is manager-and-owner only while the pilot is active. -->
+    <a class="nav-link" id="navScoutAi" onclick="window.location.href='/scout-ai'; return false;" style="display:none">Scout AI</a>
+    <span class="sep" id="navScoutAiSep" style="display:none">·</span>
+    <a class="nav-link" id="navOverview" onclick="goOwnCoaching(); return false;"><svg class="workspace-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Home</a>
     <span class="sep">·</span>
-    <a class="nav-link" id="navOverview" onclick="goOwnCoaching(); return false;"><svg class="workspace-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Coaching Dashboard</a>
-    <span class="sep">·</span>
-    <a class="nav-link" id="navCallLibrary" onclick="goCallLibrary(); return false;"><svg class="workspace-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 9v6M8 5v14M12 3v18M16 7v10M20 9v6"/></svg>Calls</a>
+    <a class="nav-link" id="navCallLibrary" onclick="goPrimaryCallWorkspace(); return false;"><svg class="workspace-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 9v6M8 5v14M12 3v18M16 7v10M20 9v6"/></svg><span id="navCallLibraryLabel">Calls</span></a>
     <!-- ⚠ (ff) THIS SEPARATOR WAS SIMPLY NEVER TYPED. The nav is hand-written
          markup, NOT generated from a list — every "·" is a literal span placed by
          hand, so nothing adds one automatically and the next link added will have
@@ -7473,7 +7476,7 @@
       <a class="nav-link" id="navTeam" tabindex="0"
          onclick="goTeam(); return false;"
          onkeydown="if(event.key === 'Enter' || event.key === ' '){event.preventDefault();goTeam();}"
-         ><svg class="workspace-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6M18 15a5 5 0 0 1 3 5"/></svg>Team<span class="nav-caret">▾</span></a>
+         ><svg class="workspace-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6M18 15a5 5 0 0 1 3 5"/></svg>Daily Digest<span class="nav-caret">▾</span></a>
       <nav class="workspace-team-pages" id="workspaceTeamPages" aria-label="Team pages"></nav>
     </span>
     <!-- Prospects nav link REMOVED 2026-08-04 (Justin: distracting). The page,
@@ -7482,9 +7485,6 @@
          in. Hash entry is wired in applyHashToState + onRouteChange below. -->
     <span class="sep" id="navKbSep" style="display:none">·</span>
     <a class="nav-link" id="navKb" onclick="goKb(); return false;" style="display:none"><svg class="workspace-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1v15"/></svg>Knowledge Base</a>
-    <!-- Scout AI is available to managers and above. The page and its API enforce
-         the same boundary; this gate only keeps it out of closer navigation. -->
-    <a class="nav-link" id="navScoutAi" onclick="window.location.href='/scout-ai'; return false;" style="display:none">Scout AI</a>
     <!-- ⚠⚠ COMING-SOON TABS ARE <span>, NOT <a> — AND THAT IS THE WHOLE
          IMPLEMENTATION OF "INERT". A <span> has no href, so it cannot navigate,
          is not in the tab order, gets no link semantics from a screen reader,
@@ -8202,8 +8202,14 @@
     }
     if (['manager', 'owner'].includes(state.me.role)) {
       document.getElementById('navScoutAi').style.display = '';
+      document.getElementById('navScoutAiSep').style.display = '';
     }
     if (state.me.role === 'manager' || state.me.role === 'owner') {
+      var callWorkspaceLabel = document.getElementById('navCallLibraryLabel');
+      if (callWorkspaceLabel) callWorkspaceLabel.textContent = 'Call Review';
+      // Managers work from the daily team digest. EOD remains available to
+      // closers and by direct route, but is not a manager primary-nav item.
+      document.getElementById('navEod').style.display = 'none';
       // ⚠ THE WRAPPER carries the gate now, not the <a> — hiding only the link
       //   would leave an empty inline-flex box and its separator in the nav.
       document.getElementById('navTeamWrap').style.display = '';
@@ -8217,12 +8223,8 @@
       });
       await loadUsers();
     }
-    // Knowledge Base: manager, owner, OR an unmanaged plain user (they curate
-    // their own personal KB). Managed users get no KB nav link.
-    if (canAccessKb()) {
-      document.getElementById('navKb').style.display = '';
-      document.getElementById('navKbSep').style.display = '';
-    }
+    // Knowledge Base remains live and is reached contextually or by direct link.
+    // It is deliberately not a permanent primary-navigation item.
 
     // Default to caller's own data; ?user=<id> pivots to another user. Managers
     // are honored too (not just admin/owner) so a pivoted Calls/coaching view
@@ -9972,7 +9974,9 @@
   // itself + its donut drills); Calls is active for the call-library view.
   function updateNavActiveStates() {
     var OVERVIEW_VIEWS = { overview: 1 };
-    var CALL_LIBRARY_VIEWS = { 'call-library': 1, 'call-review': 1 };
+    var CALL_LIBRARY_VIEWS = hasManagerContext()
+      ? { 'team-call-review': 1, 'call-review': 1 }
+      : { 'call-library': 1, 'call-review': 1 };
     var navOverview = document.getElementById('navOverview');
     var navCallLibrary = document.getElementById('navCallLibrary');
     var navEod = document.getElementById('navEod');
@@ -20336,6 +20340,11 @@
 
   // Enter the Call Library from the nav — clears any drill filter (shows all).
   // Manager-context resets the date window to the 7-day default on entry.
+  function goPrimaryCallWorkspace() {
+    if (hasManagerContext()) { setView('team-call-review'); return; }
+    goCallLibrary();
+  }
+
   function goCallLibrary() {
     state.callLibraryFilter = null;
     state.callLibrarySort = null;
