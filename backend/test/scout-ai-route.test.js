@@ -31,6 +31,28 @@ test('Scout AI defaults to the product-standard 30-day window', () => {
   assert.equal(Date.parse(range.to) - Date.parse(range.from), 30 * 24 * 60 * 60 * 1000);
 });
 
+test('Scout AI honors a stated relative period instead of the 30-day default', () => {
+  const now = '2026-10-26T12:00:00.000Z';
+  const range = scoutAiRoutes._defaultRangeForTests({ to: now }, 'Who needs the most help over the last 7 days?');
+  assert.equal(range.to, now);
+  assert.equal(range.from, '2026-10-19T12:00:00.000Z');
+  assert.equal(range.locked, true);
+});
+
+test('Scout AI understands weeks and explicit API dates still take precedence', () => {
+  const now = '2026-10-26T12:00:00.000Z';
+  const twoWeeks = scoutAiRoutes._defaultRangeForTests({ to: now }, 'Show the past 2 weeks.');
+  assert.equal(twoWeeks.from, '2026-10-12T12:00:00.000Z');
+  assert.equal(twoWeeks.locked, true);
+
+  const explicit = scoutAiRoutes._defaultRangeForTests({
+    from: '2026-10-01T00:00:00.000Z',
+    to: now,
+  }, 'Show the last 7 days.');
+  assert.equal(explicit.from, '2026-10-01T00:00:00.000Z');
+  assert.equal(explicit.locked, undefined);
+});
+
 function appFor(role) {
   const app = express();
   app.use(express.json());

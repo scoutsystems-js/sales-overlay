@@ -49,6 +49,26 @@ test('the model can request only a known closer and receives Scout facts before 
   assert.equal(result.evidence.close_rate.rate, 33);
 });
 
+test('a stated question range stays fixed even if the model requests different dates', async () => {
+  const reads = [];
+  const lockedRange = { from: '2026-10-19T12:00:00.000Z', to: '2026-10-26T12:00:00.000Z', locked: true };
+  const responses = [
+    { content: [{ type: 'tool_use', id: 'tool-1', name: 'read_objection_cohort', input: { user_id: 'josh-id', phrase: 'spouse', from: '2026-01-01T00:00:00.000Z', to: '2026-01-31T00:00:00.000Z' } }] },
+    { content: [{ type: 'text', text: 'Josh handled 2 of 4 documented spouse objections.' }] },
+  ];
+  await answerQuestion({
+    question: 'How did Josh do with spouse objections over the last 7 days?',
+    profiles: PROFILES,
+    defaultRange: lockedRange,
+    model: 'fixture-model',
+    create: async () => responses.shift(),
+    readObjectionCohort: async request => { reads.push(request); return FACTS; },
+  });
+  assert.equal(reads.length, 1);
+  assert.equal(reads[0].from, lockedRange.from);
+  assert.equal(reads[0].to, lockedRange.to);
+});
+
 test('a hallucinated closer id is rejected before any fact read', async () => {
   let read = false;
   await assert.rejects(function () {

@@ -21,13 +21,46 @@ function adminClient() {
   return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 }
 
-function defaultRange(body) {
+function relativeRangeInQuestion(question, to) {
+  const text = String(question || '');
+  const match = /\b(?:in\s+|over\s+)?(?:the\s+)?(?:last|past|previous)\s+(\d+)\s*(days?|weeks?|months?|years?)\b/i.exec(text);
+  if (!match) return null;
+
+  const amount = Number(match[1]);
+  const unit = match[2].toLowerCase();
+  if (!Number.isInteger(amount) || amount < 1) return null;
+
+  const end = new Date(to);
+  const start = new Date(end);
+  if (unit.indexOf('day') === 0) start.setUTCDate(start.getUTCDate() - amount);
+  else if (unit.indexOf('week') === 0) start.setUTCDate(start.getUTCDate() - (amount * 7));
+  else {
+    const months = unit.indexOf('year') === 0 ? amount * 12 : amount;
+    const originalDay = start.getUTCDate();
+    start.setUTCDate(1);
+    start.setUTCMonth(start.getUTCMonth() - months);
+    const lastDay = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0)).getUTCDate();
+    start.setUTCDate(Math.min(originalDay, lastDay));
+  }
+
+  if (end.getTime() - start.getTime() > 366 * 24 * 60 * 60 * 1000) {
+    throw new Error('Scout AI can answer up to one year at a time.');
+  }
+  return { from: start.toISOString(), to: end.toISOString() };
+}
+
+function defaultRange(body, question) {
   body = body || {};
   const to = body.to || new Date().toISOString();
-  const from = body.from || new Date(Date.parse(to) - (30 * 24 * 60 * 60 * 1000)).toISOString();
+  // A supplied `to` only pins “now” for a deterministic request/test. A
+  // supplied `from` is the explicit range boundary and therefore wins.
+  const stated = !body.from ? relativeRangeInQuestion(question, to) : null;
+  const from = body.from || (stated && stated.from) || new Date(Date.parse(to) - (30 * 24 * 60 * 60 * 1000)).toISOString();
   if (isNaN(Date.parse(from)) || isNaN(Date.parse(to)) || from > to) throw new Error('Choose a valid date range.');
   if (Date.parse(to) - Date.parse(from) > 366 * 24 * 60 * 60 * 1000) throw new Error('Choose a date range of one year or less.');
-  return { from, to };
+  const range = { from, to };
+  if (stated) range.locked = true;
+  return range;
 }
 
 function priorQuestions(body) {
@@ -91,7 +124,7 @@ router.post('/ask', requireAuth, requireRole(['manager', 'owner']), async functi
   try {
     const question = String((req.body && req.body.question) || '').trim();
     if (!question) return res.status(400).json({ error: 'Ask Scout a question first.' });
-    const range = defaultRange(req.body);
+    const range = defaultRange(req.body, question);
     const admin = adminClient();
     const result = await answerQuestion({
       question: question,

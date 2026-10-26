@@ -157,6 +157,9 @@ function questionWithContext(question, priorQuestions) {
 }
 
 function rangeFor(input, defaults) {
+  // A date window explicitly stated in the current question is resolved by
+  // the route. It must stay fixed for every tool read in that answer.
+  if (defaults && defaults.locked) return { from: defaults.from, to: defaults.to };
   var from = input.from || defaults.from;
   var to = input.to || defaults.to;
   if (typeof from !== 'string' || typeof to !== 'string' || isNaN(Date.parse(from)) || isNaN(Date.parse(to)) || from > to) {
