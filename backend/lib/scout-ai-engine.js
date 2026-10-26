@@ -120,7 +120,7 @@ const CALL_EXAMPLES_TOOL = {
       category: { type: 'string', enum: CATEGORIES, description: 'Canonical Scout objection category. Needed when requesting handled or not-handled objection calls.' },
       handling: { type: 'string', enum: ['handled', 'not_handled'], description: 'Use only with an objection phrase or category.' },
       outcome: { type: 'string', enum: ['closed', 'follow_up', 'lost', 'no_show', 'not_closed'], description: 'Use lost for “did not close,” “failed to close,” or “lost.” Use follow_up for still-open calls and no_show only for no-shows. Use not_closed only when the user explicitly says “not closed”; it returns a breakdown, not a blended call list.' },
-      limit: { type: 'integer', minimum: 1, maximum: 5, description: 'How many calls to return, up to five.' },
+      limit: { type: 'integer', minimum: 1, maximum: 100, description: 'How many calls to return. Use 100 only when the user explicitly asks for all matching calls.' },
       from: { type: 'string', description: 'ISO date-time. Omit to use the stated default window.' },
       to: { type: 'string', description: 'ISO date-time. Omit to use the stated default window.' },
     },
@@ -418,7 +418,30 @@ function currentQuestionNamesCloser(question, profiles) {
   });
 }
 
-function validCallExamplesToolInput(input, profiles, defaults, forceTeamSample) {
+function closerMatchesInQuestion(question, profiles) {
+  var wording = String(question || '').toLowerCase();
+  var exact = (profiles || []).filter(function (profile) {
+    var name = String(profile.name || '').trim().toLowerCase();
+    return name && wording.indexOf(name) !== -1;
+  });
+  if (exact.length) return exact;
+  var words = wording.match(/[a-z]{3,}/g) || [];
+  return (profiles || []).filter(function (profile) {
+    var first = String(profile.name || '').trim().toLowerCase().split(/\s+/)[0];
+    return first && words.some(function (word) { return first.indexOf(word) === 0; });
+  });
+}
+
+function questionRequestsAllCalls(question) {
+  return /\b(?:all|every)\b/i.test(String(question || ''));
+}
+
+function validCloserChoiceContext(input, profiles) {
+  if (!input || input.type !== 'closer_choice' || typeof input.user_id !== 'string') return null;
+  return (profiles || []).find(function (profile) { return profile.user_id === input.user_id; }) || null;
+}
+
+function validCallExamplesToolInput(input, profiles, defaults, forceTeamSample, forceAllCalls) {
   input = input || {};
   var userId = forceTeamSample ? null : (input.user_id || null);
   if (userId && !(profiles || []).some(function (profile) { return profile.user_id === userId; })) throw new Error('Scout AI could not match that closer.');
@@ -426,10 +449,10 @@ function validCallExamplesToolInput(input, profiles, defaults, forceTeamSample) 
   var category = typeof input.category === 'string' ? input.category.trim().toLowerCase() : '';
   var handling = input.handling === 'handled' || input.handling === 'not_handled' ? input.handling : null;
   var outcome = ['closed', 'follow_up', 'lost', 'no_show', 'not_closed'].indexOf(input.outcome) !== -1 ? input.outcome : null;
-  var limit = Number(input.limit == null ? 5 : input.limit);
+  var limit = forceAllCalls ? 100 : Number(input.limit == null ? 5 : input.limit);
   if (!phrase && CATEGORIES.indexOf(category) === -1 && !outcome) throw new Error('Scout AI needs an outcome, objection phrase, or category for those calls.');
   if (handling && !phrase && CATEGORIES.indexOf(category) === -1) throw new Error('Scout AI needs an objection phrase or category to filter handling.');
-  if (!Number.isInteger(limit) || limit < 1 || limit > 5) throw new Error('Scout AI can return between one and five calls.');
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new Error('Scout AI can return between one and 100 calls.');
   var userIds = (profiles || []).map(function (profile) { return profile.user_id; });
   var namesByUserId = {};
   (profiles || []).forEach(function (profile) { namesByUserId[profile.user_id] = profile.name; });
@@ -450,6 +473,7 @@ function systemPrompt(profiles, defaults) {
   return [
     'You are Scout AI. Answer only from verified Scout tool results.',
     'You never invent a number, call, quote, outcome, or reason. If the available tool cannot answer the request, say that plainly and do not use a tool.',
+    'Never show a user ID or describe an internal database limitation to the user.',
     'A phrase such as “spouse” is not the same thing as the whole Partner category. Say which one you used.',
     'Question-specific cohort rates are answer-only. They do not change Scout’s normal dashboard metrics.',
     'When you use a tool, write a short plain-language answer that names the date range and the supporting counts. Distinguish objection handling, close rate, and earned stage scores; they answer different questions.',
@@ -460,7 +484,7 @@ function systemPrompt(profiles, defaults) {
     'For “what does a closer do when an objection works versus when it does not,” use the objection-coaching-comparison tool once for that closer and category. State only the saved repeated patterns it returns; never add a cause, outcome, or pattern that is not present.',
     'For an overall close-rate question, use the closer close-rate tool. For “who needs help with Discovery/Pitch/Close/Intro/Objection Handling,” use the stage-performance tool with that stage and explain that only sufficiently measured scores are ranked. For “who needs the most coaching overall,” use the stage-performance tool exactly once with no stage and no closer, then state the returned priority directly; do not split it into separate stage reads or call a partial result an overall answer. Do not claim that one stage causes, feeds into, or is higher leverage than another unless a Scout fact tool explicitly returned that relationship.',
     'For a request to show saved calls or examples for any sales stage, use the stage-examples tool. Describe only the saved exchange or moment; never say it caused a grade, handling result, or call outcome.',
-    'For a request to show specific recent objection calls or calls by outcome, use the call-examples tool. Return the available real calls directly. When the user did not name a closer, omit user_id: Scout will choose a varied sample from the authorized team, rather than asking the user to choose a closer. Do not refuse by describing a tool limitation. “Did not close,” “failed to close,” and “lost” mean lost only. Open follow-ups and no-shows are different outcomes and must never be called lost. For the exact phrase “not closed,” report the returned Lost, Open, and No-show breakdown and ask which group they want to review. A saved objection exchange can support an objection request. For an Open call, use its saved outcome_evidence only when it is present, call it “what kept it open,” and say the deal remains open; never infer a reason from the outcome alone or claim the reason caused a loss.',
+    'For a request to show specific recent objection calls or calls by outcome, use the call-examples tool. Return the available real calls directly. When the user did not name a closer, omit user_id: Scout will choose a varied sample from the authorized team, rather than asking the user to choose a closer. Do not refuse by describing a tool limitation. If the user asks for all calls, request limit 100; say how many matched and whether every matching call is shown. “Did not close,” “failed to close,” and “lost” mean lost only. Open follow-ups and no-shows are different outcomes and must never be called lost. For the exact phrase “not closed,” report the returned Lost, Open, and No-show breakdown and ask which group they want to review. A saved objection exchange can support an objection request. For an Open call, use its saved outcome_evidence only when it is present, call it “what kept it open,” and say the deal remains open; never infer a reason from the outcome alone or claim the reason caused a loss.',
     'Default date range: ' + defaults.from + ' through ' + defaults.to + '.',
     'Available closers (use only these ids):\n' + people,
   ].join('\n\n');
@@ -528,6 +552,23 @@ async function answerQuestion(options) {
   var profiles = options.profiles || [];
   var defaults = options.defaultRange;
   if (!defaults || !defaults.from || !defaults.to) throw new Error('Scout AI needs a default date range.');
+  var selectedCloser = validCloserChoiceContext(options.followUp, profiles);
+  if (selectedCloser) profiles = [selectedCloser];
+  if (!selectedCloser) {
+    var ambiguousClosers = closerMatchesInQuestion(question, profiles);
+    if (ambiguousClosers.length > 1) {
+      return {
+        status: 'needs_closer_choice',
+        answer: 'I found more than one closer named ' + String(ambiguousClosers[0].name || '').split(/\s+/)[0] + '. Which one do you mean?',
+        evidence: null,
+        follow_up_context: {
+          type: 'closer_choices',
+          question: question,
+          choices: ambiguousClosers.map(function (profile) { return { user_id: profile.user_id, name: profile.name }; }),
+        },
+      };
+    }
+  }
   var followUp = validFollowUpContext(options.followUp, profiles, defaults);
   if (!followUp && isPerformanceCoachingQuestion(question)) {
     var diagnosis = await performanceCoachingDiagnosis(options, profiles, defaults);
@@ -639,7 +680,7 @@ async function answerQuestion(options) {
     }
     if (tool.name === CALL_EXAMPLES_TOOL.name) {
       if (typeof options.readCallExamples !== 'function') throw new Error('Scout AI is not configured.');
-      return { kind: 'call-examples', tool: tool, request: validCallExamplesToolInput(tool.input, profiles, defaults, !currentQuestionNamesCloser(question, profiles)) };
+      return { kind: 'call-examples', tool: tool, request: validCallExamplesToolInput(tool.input, profiles, defaults, !currentQuestionNamesCloser(question, profiles), questionRequestsAllCalls(question)) };
     }
     throw new Error('Scout AI requested an unavailable tool.');
   });

@@ -39,6 +39,14 @@ test('the active composer follows the conversation instead of covering the answe
   assert.doesNotMatch(source, /#askForm\s*\{\s*position:sticky/);
 });
 
+test('an ambiguous closer name becomes a human choice, not an internal-id answer', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'web', 'scout-ai.html'), 'utf8');
+  assert.match(source, /type === 'closer_choices'/);
+  assert.match(source, /data-closer-choice/);
+  assert.match(source, /type:'closer_choice'/);
+  assert.match(source, /Choose the closer to review/);
+});
+
 test('an overall coaching priority has its own evidence card', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'web', 'scout-ai.html'), 'utf8');
   assert.match(source, /evidence\.priority/);

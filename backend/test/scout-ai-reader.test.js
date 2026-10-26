@@ -264,6 +264,8 @@ test('the bounded reader returns real not-handled Partner calls with their exist
     prospect_name: 'Blake',
     call_date: '2026-10-03T12:00:00Z',
     recording_url: 'https://recording.example/partner',
+    user_id: 'josh',
+    closer_name: null,
     outcome: 'lost',
     outcome_evidence: null,
     objection: {
@@ -274,6 +276,17 @@ test('the bounded reader returns real not-handled Partner calls with their exist
       closer_response: 'What would your partner need to see?',
     },
   });
+});
+
+test('single-closer call results retain the owner for the Call Review link', async () => {
+  const result = await readCallExamples(fakeAdmin(), {
+    userId: 'josh', namesByUserId: { josh: 'Josh P' },
+    from: '2026-10-01T00:00:00Z', to: '2026-10-15T23:59:59Z',
+    filter: { outcome: 'closed' }, limit: 100,
+  });
+  assert.ok(result.calls.length);
+  assert.ok(result.calls.every(function (call) { return call.user_id === 'josh'; }));
+  assert.ok(result.calls.every(function (call) { return call.closer_name === 'Josh P'; }));
 });
 
 test('the bounded reader can return a named team sample when no closer was requested', async () => {

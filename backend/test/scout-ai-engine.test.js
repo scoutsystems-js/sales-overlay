@@ -84,6 +84,47 @@ test('a hallucinated closer id is rejected before any fact read', async () => {
   assert.equal(read, false);
 });
 
+test('an ambiguous first name asks the manager to choose before Scout reads any calls', async () => {
+  let modelCalled = false;
+  const result = await answerQuestion({
+    question: 'Show me all of Josh’s closed calls for the last 7 days.',
+    profiles: [
+      { user_id: 'josh-pinner', name: 'Josh Pinner' },
+      { user_id: 'joshua-pinner', name: 'Joshua Pinner' },
+    ],
+    defaultRange: DEFAULT_RANGE,
+    model: 'fixture-model',
+    create: async () => { modelCalled = true; throw new Error('must ask before reading'); },
+    readObjectionCohort: async () => FACTS,
+  });
+  assert.equal(modelCalled, false);
+  assert.equal(result.status, 'needs_closer_choice');
+  assert.match(result.answer, /more than one closer named Josh/i);
+  assert.deepEqual(result.follow_up_context.choices.map(function (choice) { return choice.name; }), ['Josh Pinner', 'Joshua Pinner']);
+  assert.doesNotMatch(result.answer, /josh-pinner|joshua-pinner/);
+});
+
+test('a selected closer restricts the next fact read to that closer alone', async () => {
+  const reads = [];
+  const result = await answerQuestion({
+    question: 'Show me all of Josh’s closed calls for the last 7 days.',
+    profiles: [
+      { user_id: 'josh-pinner', name: 'Josh Pinner' },
+      { user_id: 'joshua-pinner', name: 'Joshua Pinner' },
+    ],
+    defaultRange: DEFAULT_RANGE,
+    followUp: { type: 'closer_choice', user_id: 'josh-pinner' },
+    model: 'fixture-model',
+    create: async () => ({ content: [{ type: 'tool_use', id: 'calls', name: 'read_call_examples', input: { user_id: 'josh-pinner', outcome: 'closed', limit: 5 } }] }),
+    readObjectionCohort: async () => FACTS,
+    readCallExamples: async request => { reads.push(request); return { kind: 'call_examples', window: DEFAULT_RANGE, matching_call_count: 1, calls: [] }; },
+  });
+  assert.equal(reads.length, 1);
+  assert.equal(reads[0].userId, 'josh-pinner');
+  assert.equal(reads[0].limit, 100, 'an explicit all-calls request must not silently become a five-call sample');
+  assert.equal(result.evidence.kind, 'call_examples');
+});
+
 test('the model can read the team objection overview without inventing a closer cohort', async () => {
   const requests = [];
   const reads = [];

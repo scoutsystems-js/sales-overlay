@@ -65,7 +65,7 @@ function validateCallExamplesRequest(input) {
   if (!phrase && !category && !outcome) throw new Error('An outcome, objection phrase, or objection category is required.');
   if (handling && !phrase && !category) throw new Error('Objection handling needs an objection phrase or category.');
   var limit = Number(input.limit);
-  if (!Number.isInteger(limit) || limit < 1 || limit > 5) throw new Error('Choose between one and five calls.');
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new Error('Choose between one and 100 calls.');
   return {
     userId: userId,
     userIds: userIds,
@@ -295,6 +295,9 @@ async function readCallExamples(admin, request) {
       });
   }
   var matches = calls.map(function (call) {
+    // Defense in depth: a single-closer answer must never render a row owned by
+    // somebody else, even if an upstream database read is unexpectedly broad.
+    if (input.userId && call.user_id !== input.userId) return null;
     var outcome = outcomes[call.id] || null;
     if (input.filter.outcome === 'not_closed' && (!outcome || outcome === 'closed')) return null;
     if (input.filter.outcome && input.filter.outcome !== 'not_closed' && outcome !== input.filter.outcome) return null;
@@ -320,10 +323,8 @@ async function readCallExamples(admin, request) {
         closer_response: moment.closer_response_verified === true && typeof moment.closer_response === 'string' && moment.closer_response.trim() ? moment.closer_response.trim() : null,
       } : null,
     };
-    if (!input.userId) {
-      example.user_id = call.user_id;
-      example.closer_name = input.namesByUserId[call.user_id] || null;
-    }
+    example.user_id = call.user_id;
+    example.closer_name = input.namesByUserId[call.user_id] || null;
     return example;
   }).filter(Boolean).sort(function (left, right) {
     return String(right.call_date || '').localeCompare(String(left.call_date || '')) || left.call_id.localeCompare(right.call_id);
