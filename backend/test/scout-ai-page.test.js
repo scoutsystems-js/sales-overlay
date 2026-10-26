@@ -53,6 +53,16 @@ test('an Objection Handling priority card opens that closer\'s existing objectio
   assert.match(source, /metric-link/);
 });
 
+test('a performance diagnosis gives the manager grounded coaching calls and a separate objections drilldown', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'web', 'scout-ai.html'), 'utf8');
+  assert.match(source, /performance_coaching_diagnosis/);
+  assert.match(source, /Strongest repeated coaching gap/);
+  assert.match(source, /Open objection drilldown/);
+  assert.match(source, /target="_blank"/);
+  assert.match(source, /closer_response/);
+  assert.match(source, /Closer response/);
+});
+
 test('coaching priority actions can select any saved call stage without guessing from a typed yes', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'web', 'scout-ai.html'), 'utf8');
   assert.match(source, /stage_choices/);

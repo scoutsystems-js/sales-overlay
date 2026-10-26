@@ -236,6 +236,75 @@ function coachingPriorityAnswer(facts) {
   return 'For this date range, Scout found a tie for the lowest measured coaching score: ' + labels.join(' and ') + '. The scores do not establish that one area causes the other. Choose an area below to review its saved evidence.';
 }
 
+function isPerformanceCoachingQuestion(question) {
+  var text = String(question || '').toLowerCase();
+  return /(?:what|which|who)\s+(?:closer|rep|person).*(?:needs?|need).*(?:most\s+)?(?:coaching|help)|(?:what|which|who).*(?:most\s+)?(?:coaching|help).*(?:closer|rep|person)/.test(text);
+}
+
+function strongestRepeatedObjection(overview) {
+  var categories = overview && overview.categories ? Object.keys(overview.categories).map(function (key) { return overview.categories[key]; }) : [];
+  return categories.filter(function (item) {
+    return item && item.total >= 3 && item.rate != null;
+  }).sort(function (left, right) {
+    return left.rate - right.rate || right.total - left.total || String(left.category).localeCompare(String(right.category));
+  })[0] || null;
+}
+
+function dateRangeLabel(window) {
+  return String(window && window.from || '').slice(0, 10) + ' through ' + String(window && window.to || '').slice(0, 10);
+}
+
+function performanceDiagnosisAnswer(closeRate, focus, window) {
+  var name = closeRate.name || 'This closer';
+  var answer = 'From ' + dateRangeLabel(window) + ', ' + name + ' has the lowest close rate in the group at ' + closeRate.closed + ' of ' + closeRate.total + ' prospects (' + closeRate.pct + '%). ';
+  if (!focus) return answer + 'Scout does not yet have a repeated, documented coaching pattern strong enough to point to one specific area.';
+  var category = String(focus.category || 'this category');
+  var label = category.charAt(0).toUpperCase() + category.slice(1);
+  return answer + label + ' objections are the strongest repeated coaching opportunity in the recorded calls: ' + focus.handled + ' of ' + focus.total + ' were handled (' + focus.rate + '%). That does not prove it caused the low close rate, but it is the clearest repeated gap to review first.';
+}
+
+function usableObjectionCalls(result) {
+  return ((result && result.calls) || []).filter(function (call) {
+    var objection = call && call.objection;
+    return objection && typeof objection.quote === 'string' && objection.quote.trim() && typeof objection.closer_response === 'string' && objection.closer_response.trim();
+  });
+}
+
+async function performanceCoachingDiagnosis(options, profiles, defaults) {
+  if (typeof options.readTeamCloseRateLeaderboard !== 'function' || typeof options.readCloserObjectionOverview !== 'function' || typeof options.readCallExamples !== 'function') return null;
+  var namesByUserId = {};
+  profiles.forEach(function (profile) { namesByUserId[profile.user_id] = profile.name; });
+  var leaderboard = await options.readTeamCloseRateLeaderboard({ userIds: Object.keys(namesByUserId), namesByUserId: namesByUserId, from: defaults.from, to: defaults.to });
+  var closeRate = leaderboard && leaderboard.closers && leaderboard.closers[0];
+  if (!closeRate) return null;
+  var overview = await options.readCloserObjectionOverview({ userId: closeRate.user_id, name: closeRate.name, from: defaults.from, to: defaults.to });
+  var focus = strongestRepeatedObjection(overview);
+  var missed = { calls: [] };
+  var handled = { calls: [] };
+  if (focus) {
+    var reads = await Promise.all([
+      options.readCallExamples({ userId: closeRate.user_id, filter: { phrase: null, category: focus.category, handling: 'not_handled', outcome: null }, limit: 2, from: defaults.from, to: defaults.to }),
+      options.readCallExamples({ userId: closeRate.user_id, filter: { phrase: null, category: focus.category, handling: 'handled', outcome: null }, limit: 1, from: defaults.from, to: defaults.to }),
+    ]);
+    missed = reads[0] || missed;
+    handled = reads[1] || handled;
+  }
+  return {
+    status: 'answered',
+    answer: performanceDiagnosisAnswer(closeRate, focus, leaderboard.window || defaults),
+    evidence: {
+      kind: 'performance_coaching_diagnosis',
+      window: leaderboard.window || defaults,
+      closer: { user_id: closeRate.user_id, name: closeRate.name },
+      close_rate: closeRate,
+      coaching_focus: focus,
+      missed_calls: usableObjectionCalls(missed),
+      handled_calls: usableObjectionCalls(handled),
+    },
+    follow_up_context: null,
+  };
+}
+
 function followUpContextFromFacts(facts) {
   if (!facts || facts.kind !== 'stage_performance' || !facts.priority || !Array.isArray(facts.priority.ties) || !facts.priority.ties.length || !facts.window) return null;
   var actions = facts.priority.ties.map(function (priority) {
@@ -443,6 +512,10 @@ async function answerQuestion(options) {
   var defaults = options.defaultRange;
   if (!defaults || !defaults.from || !defaults.to) throw new Error('Scout AI needs a default date range.');
   var followUp = validFollowUpContext(options.followUp, profiles, defaults);
+  if (!followUp && isPerformanceCoachingQuestion(question)) {
+    var diagnosis = await performanceCoachingDiagnosis(options, profiles, defaults);
+    if (diagnosis) return diagnosis;
+  }
   if (isAffirmative(question) && followUp) {
     if (followUp.type === 'stage_choices') {
       return {

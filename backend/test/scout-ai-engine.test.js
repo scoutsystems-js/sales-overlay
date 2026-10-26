@@ -183,6 +183,38 @@ test('the model uses one complete stage read for who needs the most coaching ove
   assert.match(result.answer, /lowest measured coaching area is Josh P · Discovery/);
 });
 
+test('a performance-and-coaching question leads with the lowest close rate and a repeated factual gap', async () => {
+  const result = await answerQuestion({
+    question: 'What closer needs the most coaching and in which area?', profiles: PROFILES, defaultRange: DEFAULT_RANGE, model: 'fixture-model',
+    create: async () => { throw new Error('the direct diagnosis should not ask the model to choose a metric'); },
+    readObjectionCohort: async () => FACTS,
+    readTeamCloseRateLeaderboard: async () => ({
+      kind: 'team_close_rate_leaderboard', window: DEFAULT_RANGE,
+      closers: [{ user_id: 'josh-id', name: 'Josh P', closed: 2, total: 15, pct: 13 }],
+    }),
+    readCloserObjectionOverview: async () => ({
+      kind: 'closer_objection_overview', window: DEFAULT_RANGE, closer: { user_id: 'josh-id', name: 'Josh P' },
+      categories: {
+        fear: { category: 'fear', handled: 4, total: 10, rate: 40 },
+        partner: { category: 'partner', handled: 1, total: 8, rate: 13 },
+      },
+    }),
+    readCallExamples: async request => ({
+      kind: 'call_examples', window: DEFAULT_RANGE, filter: request.filter, calls: [{
+        call_id: 'missed-1', prospect_name: 'Avery', call_date: DEFAULT_RANGE.to, outcome: 'lost',
+        objection: { category: 'partner', resolution: 'unhandled', quote: 'I need to ask my partner.', closer_response: 'What would your partner need to see?' },
+      }],
+    }),
+  });
+  assert.equal(result.status, 'answered');
+  assert.equal(result.evidence.kind, 'performance_coaching_diagnosis');
+  assert.equal(result.evidence.close_rate.pct, 13);
+  assert.equal(result.evidence.coaching_focus.category, 'partner');
+  assert.match(result.answer, /Josh P has the lowest close rate/);
+  assert.match(result.answer, /Partner objections are the strongest repeated coaching opportunity/);
+  assert.match(result.answer, /does not prove it caused the low close rate/i);
+});
+
 test('a tied coaching priority saves one factual next action for every tied stage', async () => {
   const responses = [
     { content: [{ type: 'tool_use', id: 'tool-priority', name: 'read_stage_performance', input: {} }] },

@@ -24,6 +24,13 @@ require.cache[authPath].exports = Object.assign({}, realAuth, {
 });
 const scoutAiRoutes = require('../routes/scout-ai');
 
+test('Scout AI defaults to the product-standard 30-day window', () => {
+  const now = '2026-10-26T12:00:00.000Z';
+  const range = scoutAiRoutes._defaultRangeForTests({ to: now });
+  assert.equal(range.to, now);
+  assert.equal(Date.parse(range.to) - Date.parse(range.from), 30 * 24 * 60 * 60 * 1000);
+});
+
 function appFor(role) {
   const app = express();
   app.use(express.json());

@@ -125,7 +125,7 @@ async function highlightsForCalls(admin, callIds) {
   if (!callIds.length) return [];
   return chunked(callIds, function (ids) {
     return admin.from('call_highlights')
-      .select('id, fathom_call_id, type, quote, speaker, timestamp_seconds, objection_surface, objection_category, objection_class, resolution')
+      .select('id, fathom_call_id, type, quote, speaker, timestamp_seconds, objection_surface, objection_category, objection_class, resolution, closer_response, closer_response_verified')
       .in('fathom_call_id', ids)
       .eq('type', 'objection');
   });
@@ -278,6 +278,7 @@ async function readCallExamples(admin, request) {
         category: moment.objection_category || null,
         resolution: moment.resolution || null,
         timestamp_seconds: Number.isFinite(moment.timestamp_seconds) ? moment.timestamp_seconds : null,
+        closer_response: moment.closer_response_verified === true && typeof moment.closer_response === 'string' && moment.closer_response.trim() ? moment.closer_response.trim() : null,
       } : null,
     };
   }).filter(Boolean).sort(function (left, right) {
@@ -401,6 +402,32 @@ async function readCloserCloseRate(admin, request) {
     kind: 'closer_close_rate',
     window: { from: input.from, to: input.to },
     close_rate: rates[input.userIds[0]] || { closed: 0, total: 0, pct: null },
+  };
+}
+
+// This is a ranking view over the same canonical prospect close-rate computation
+// already used everywhere else in Scout. A closer with no attributable prospects
+// is absent instead of being treated as a 0% performer.
+async function readTeamCloseRateLeaderboard(admin, request) {
+  var input = validateTeamRequest(request);
+  var rates = await fetchProspectCloseRates(admin, input.userIds, input.from, input.to);
+  var closers = input.userIds.map(function (userId) {
+    var rate = rates[userId] || null;
+    if (!rate || !rate.total || rate.pct == null) return null;
+    return {
+      user_id: userId,
+      name: (input.namesByUserId && input.namesByUserId[userId]) || 'Closer name not recorded',
+      closed: rate.closed,
+      total: rate.total,
+      pct: rate.pct,
+    };
+  }).filter(Boolean).sort(function (left, right) {
+    return left.pct - right.pct || right.total - left.total || left.name.localeCompare(right.name);
+  });
+  return {
+    kind: 'team_close_rate_leaderboard',
+    window: { from: input.from, to: input.to },
+    closers: closers,
   };
 }
 
@@ -548,6 +575,7 @@ module.exports = {
   readCloserObjectionOverview: readCloserObjectionOverview,
   readTeamObjectionLeaderboard: readTeamObjectionLeaderboard,
   readCloserCloseRate: readCloserCloseRate,
+  readTeamCloseRateLeaderboard: readTeamCloseRateLeaderboard,
   readStagePerformance: readStagePerformance,
   readStageExamples: readStageExamples,
 };

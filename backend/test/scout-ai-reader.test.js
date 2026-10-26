@@ -14,7 +14,7 @@ test('Scout AI has a bounded database reader before a question route can exist',
   );
 });
 
-const { readObjectionCohort, readTeamObjections, readCloserObjectionOverview, readTeamObjectionLeaderboard, readCloserCloseRate, readStagePerformance, readStageExamples, readCallExamples } = require('../lib/scout-ai-reader');
+const { readObjectionCohort, readTeamObjections, readCloserObjectionOverview, readTeamObjectionLeaderboard, readCloserCloseRate, readTeamCloseRateLeaderboard, readStagePerformance, readStageExamples, readCallExamples } = require('../lib/scout-ai-reader');
 const { comparisonFromSavedCoaching } = require('../lib/scout-ai-coaching-comparison');
 
 const CALLS = [
@@ -27,7 +27,7 @@ const CALLS = [
 ];
 const HIGHLIGHTS = [
   { id: 'm-spouse', fathom_call_id: 'call-spouse', type: 'objection', quote: 'My spouse needs to be part of this.', speaker: 'prospect', timestamp_seconds: 90, objection_surface: 'I need to speak with my spouse', objection_category: 'partner', objection_class: 'true_objection', resolution: 'handled' },
-  { id: 'm-partner', fathom_call_id: 'call-partner', type: 'objection', quote: 'I need to speak with my business partner.', speaker: 'prospect', timestamp_seconds: 110, objection_surface: 'I need my partner', objection_category: 'partner', objection_class: 'true_objection', resolution: 'unhandled' },
+  { id: 'm-partner', fathom_call_id: 'call-partner', type: 'objection', quote: 'I need to speak with my business partner.', speaker: 'prospect', timestamp_seconds: 110, objection_surface: 'I need my partner', objection_category: 'partner', objection_class: 'true_objection', resolution: 'unhandled', closer_response: 'What would your partner need to see?', closer_response_verified: true },
   { id: 'm-discovery', fathom_call_id: 'call-spouse', type: 'strong_moment', section: 'discovery', quote: 'We are trying to find a better option.', speaker: 'prospect', timestamp_seconds: 60, coaching_evidence: { stage: 'discovery', prospect_context: { quote: 'We are trying to find a better option.' }, closer_probe: { quote: 'What has made the current option difficult?' }, prospect_detail: { quote: 'The lack of support has been the hardest part.' } } },
   { id: 'm-pitch', fathom_call_id: 'call-spouse', type: 'strong_moment', section: 'pitch', quote: 'How would this work?', speaker: 'prospect', timestamp_seconds: 130, coaching_evidence: { stage: 'pitch', prospect_question: { quote: 'How would this work?' }, closer_explanation: { quote: 'Here is how the support plan works.' }, prospect_confirmation: { quote: 'That makes sense.' } } },
   { id: 'm-intro', fathom_call_id: 'call-partner', type: 'strong_moment', section: 'intro', quote: 'Thanks for making the time today.', speaker: 'closer', timestamp_seconds: 10 },
@@ -151,6 +151,15 @@ test('the bounded reader uses Scout’s canonical prospect close rate for a clos
   assert.deepEqual(result.window, { from: '2026-10-01T00:00:00Z', to: '2026-10-31T23:59:59Z' });
 });
 
+test('the team close-rate reader reuses Scout’s canonical prospect close rate and ranks only measured closers', async () => {
+  const result = await readTeamCloseRateLeaderboard(fakeAdmin(), {
+    userIds: ['josh', 'empty'], namesByUserId: { josh: 'Josh P', empty: 'No Calls' },
+    from: '2026-10-01T00:00:00Z', to: '2026-10-31T23:59:59Z',
+  });
+  assert.equal(result.kind, 'team_close_rate_leaderboard');
+  assert.deepEqual(result.closers, [{ user_id: 'josh', name: 'Josh P', closed: 1, total: 2, pct: 50 }]);
+});
+
 function stageEligibility(score) {
   const stage = require('../lib/stage-eligibility');
   const sections = Object.fromEntries(stage.SECTIONS.map(function (section) {
@@ -261,6 +270,7 @@ test('the bounded reader returns real not-handled Partner calls with their exist
       category: 'partner',
       resolution: 'unhandled',
       timestamp_seconds: 110,
+      closer_response: 'What would your partner need to see?',
     },
   });
 });

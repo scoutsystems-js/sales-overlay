@@ -3,7 +3,7 @@
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const { requireAuth, requireRole } = require('../middleware/auth');
-const { validateRequest, readObjectionCohort, readObjectionCoachingComparison, readTeamObjections, readCloserObjectionOverview, readTeamObjectionLeaderboard, readCloserCloseRate, readStagePerformance, readStageExamples, readCallExamples } = require('../lib/scout-ai-reader');
+const { validateRequest, readObjectionCohort, readObjectionCoachingComparison, readTeamObjections, readCloserObjectionOverview, readTeamObjectionLeaderboard, readCloserCloseRate, readTeamCloseRateLeaderboard, readStagePerformance, readStageExamples, readCallExamples } = require('../lib/scout-ai-reader');
 const { answerQuestion } = require('../lib/scout-ai-engine');
 const { visibleUserIds } = require('../lib/scout-ai-scope');
 const { resolveDisplayName } = require('../lib/display-name');
@@ -24,7 +24,7 @@ function adminClient() {
 function defaultRange(body) {
   body = body || {};
   const to = body.to || new Date().toISOString();
-  const from = body.from || new Date(Date.parse(to) - (90 * 24 * 60 * 60 * 1000)).toISOString();
+  const from = body.from || new Date(Date.parse(to) - (30 * 24 * 60 * 60 * 1000)).toISOString();
   if (isNaN(Date.parse(from)) || isNaN(Date.parse(to)) || from > to) throw new Error('Choose a valid date range.');
   if (Date.parse(to) - Date.parse(from) > 366 * 24 * 60 * 60 * 1000) throw new Error('Choose a date range of one year or less.');
   return { from, to };
@@ -107,6 +107,7 @@ router.post('/ask', requireAuth, requireRole(['manager', 'owner']), async functi
       readCloserObjectionOverview: function (input) { return readCloserObjectionOverview(admin, input); },
       readTeamObjectionLeaderboard: function (input) { return readTeamObjectionLeaderboard(admin, input); },
       readCloserCloseRate: function (input) { return readCloserCloseRate(admin, input); },
+      readTeamCloseRateLeaderboard: function (input) { return readTeamCloseRateLeaderboard(admin, input); },
       readStagePerformance: function (input) { return readStagePerformance(admin, input); },
       readStageExamples: function (input) { return readStageExamples(admin, input); },
       readCallExamples: function (input) { return readCallExamples(admin, input); },
