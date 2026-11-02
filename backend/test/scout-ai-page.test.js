@@ -39,6 +39,17 @@ test('the active composer follows the conversation instead of covering the answe
   assert.doesNotMatch(source, /#askForm\s*\{\s*position:sticky/);
 });
 
+test('the Scout AI composer gives optional matching search suggestions without limiting free-form questions', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'web', 'scout-ai.html'), 'utf8');
+  assert.match(source, /SUGGESTED_SEARCHES/);
+  assert.match(source, /Show me the last 30 days of follow-ups/);
+  assert.match(source, /What closer needs the most coaching and in which area/);
+  assert.match(source, /Show me five calls where a Partner objection was not handled/);
+  assert.match(source, /data-suggestion-index/);
+  assert.match(source, /fillSuggestion/);
+  assert.match(source, /aria-autocomplete="list"/);
+});
+
 test('an ambiguous closer name becomes a human choice, not an internal-id answer', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'web', 'scout-ai.html'), 'utf8');
   assert.match(source, /type === 'closer_choices'/);
